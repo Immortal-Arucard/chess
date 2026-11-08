@@ -116,6 +116,25 @@ export function createChessGateway() {
       return { posts, nextCursor: posts.length < limit ? null : { createdAt: posts[posts.length - 1].createdAt, id: posts[posts.length - 1].id } };
     },
     async createPost(body) { await send('/api/posts', { body }); },
+    async listDiscussion(options) {
+      const limit = options && options.limit ? options.limit : 20;
+      const query = new URLSearchParams({ limit: String(limit) });
+      if (options && options.before) {
+        query.set('before', options.before.createdAt);
+        query.set('beforeId', options.before.id);
+      }
+      if (options && options.after) {
+        query.set('after', options.after.createdAt);
+        query.set('afterId', options.after.id);
+      }
+      const response = await fetch('/api/discussion?' + query.toString(), { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'The discussion could not be loaded.');
+      return { messages: body.messages || [] };
+    },
+    async sendDiscussion(body) {
+      return send('/api/discussion', { body });
+    },
     async listReplies(postId, options) {
       const cursor = options && options.cursor;
       const limit = options && options.limit ? options.limit : 20;

@@ -1,4 +1,4 @@
-import { LIMITS, cleanBody, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
+import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -194,11 +194,15 @@ export function mountCommunity(root, options) {
   }
 
   function feed() {
-    const heading = el('p', null, 'Signed in as ' + profile.displayName + '.');
+    const heading = el('p', null, 'Signed in as ');
+    const nameLink = document.createElement('a');
+    nameLink.href = profilePath(profile.id);
+    nameLink.textContent = profile.displayName;
+    heading.append(nameLink, document.createTextNode('. '));
     const ownProfile = document.createElement('a');
     ownProfile.href = profilePath(profile.id);
     ownProfile.textContent = 'Your profile';
-    heading.append(document.createTextNode(' '), ownProfile);
+    heading.append(ownProfile);
     const rename = document.createElement('input');
     rename.type = 'text';
     rename.maxLength = LIMITS.name;
@@ -380,6 +384,131 @@ export function mountCommunity(root, options) {
   return { render };
 }
 
+export function mountDiscussion(root, options) {
+  const gateway = options.gateway || null;
+  let profile = null;
+  let messages = [];
+  let error = '';
+  let notice = '';
+  let oldest = null;
+  let timer = 0;
+  const seen = new Set();
+
+  function remember(items) {
+    items.forEach((item) => {
+      if (!item || seen.has(item.id)) return;
+      seen.add(item.id);
+      messages.push(item);
+    });
+    messages.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)));
+    oldest = messages[0] || null;
+  }
+
+  function render() {
+    root.replaceChildren();
+    root.className = 'community';
+    const back = document.createElement('a');
+    back.href = '/community/';
+    back.textContent = 'Community';
+    root.append(back, el('h2', null, 'Discussion'), el('p', 'community-note', 'One conversation for everyone who has joined Chess. Messages are kept by the Chess account service, not on this device. New messages are checked every few seconds.'));
+    if (!options.configured) {
+      root.append(el('p', null, 'The discussion could not be reached. Nothing from it is stored on this device.'));
+      return;
+    }
+    if (error) root.append(el('p', 'community-error', error));
+    if (notice) root.append(el('p', 'community-status', notice));
+    if (oldest) {
+      const earlier = el('button', 'tool', 'Earlier messages');
+      earlier.type = 'button';
+      earlier.addEventListener('click', () => loadOlder());
+      root.append(earlier);
+    }
+    const log = el('div', 'discussion-log');
+    log.id = 'discussion-log';
+    if (!messages.length) log.append(el('p', null, 'No messages yet.'));
+    messages.forEach((item) => {
+      const line = el('p', 'discussion-line');
+      const who = document.createElement('a');
+      who.href = profilePath(item.authorId);
+      who.textContent = item.authorName || 'Member';
+      line.append(who, document.createTextNode(' ' + item.body));
+      log.append(line);
+    });
+    root.append(log);
+    if (!profile) {
+      root.append(el('p', 'community-note', 'Sign in and click Join Chess before writing in the discussion.'));
+      return;
+    }
+    const input = document.createElement('textarea');
+    input.id = 'discussion-body';
+    input.maxLength = 1000;
+    input.rows = 3;
+    const send = el('button', 'tool', 'Send');
+    send.id = 'discussion-send';
+    send.type = 'button';
+    send.addEventListener('click', () => submit(input));
+    root.append(field('Message', input), send);
+  }
+
+  async function submit(input) {
+    const result = cleanDiscussion(input.value);
+    if (!result.ok) { error = result.error; render(); return; }
+    error = '';
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      error = 'The discussion is not stored on this device.';
+      render();
+      return;
+    }
+    try {
+      const session = await gateway.profile();
+      profile = session;
+      if (!profile) throw new Error('Sign in and click Join Chess before writing in the discussion.');
+      const message = await gateway.sendDiscussion(result.value);
+      remember([message]);
+      notice = '';
+    } catch (err) {
+      error = err && err.message ? err.message : 'The discussion is not stored on this device.';
+    }
+    render();
+  }
+
+  async function loadOlder() {
+    if (!oldest) return;
+    try {
+      const page = await gateway.listDiscussion({ before: { createdAt: oldest.createdAt, id: oldest.id }, limit: 20 });
+      if (!page.messages.length) notice = 'No earlier messages.';
+      remember(page.messages);
+    } catch (err) {
+      error = err && err.message ? err.message : 'The discussion could not be loaded.';
+    }
+    render();
+  }
+
+  async function loadNew() {
+    if (document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    const newest = messages[messages.length - 1];
+    try {
+      const page = await gateway.listDiscussion(newest
+        ? { after: { createdAt: newest.createdAt, id: newest.id }, limit: 20 }
+        : { limit: 20 });
+      if (page.messages.length) {
+        remember(page.messages);
+        render();
+      }
+    } catch (err) { /* the next check tries again */ }
+  }
+
+  render();
+  if (!options.configured || !gateway) return;
+  gateway.profile().then((person) => { profile = person; render(); }).catch(() => { profile = null; });
+  gateway.listDiscussion({ limit: 20 }).then((page) => { remember(page.messages); render(); }).catch((err) => {
+    error = err && err.message ? err.message : 'The discussion could not be loaded.';
+    render();
+  });
+  timer = window.setInterval(loadNew, 4000);
+  window.addEventListener('pagehide', () => window.clearInterval(timer));
+}
+
 export function mountProfile(root, options) {
   const gateway = options.gateway || null;
   let phase = options.configured && options.valid ? 'loading' : 'ready';
@@ -426,6 +555,7 @@ export function mountProfile(root, options) {
       return;
     }
     root.append(el('h2', null, person.displayName));
+    root.append(el('p', 'community-note', 'This is a Chess community profile. It does not show an email address or any other service.'));
     if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
     if (viewer && viewer.id === person.id) {
       const name = document.createElement('input');

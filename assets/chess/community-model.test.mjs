@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { chessAccess, cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
+import { chessAccess, cleanBody, cleanDiscussion, cleanName, cleanReason, communityRoute, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
 import { assertPublishable, communityConfig } from './community-config.js';
 
 const name = cleanName('  Ada  Lovelace ');
@@ -28,6 +28,10 @@ assert.equal(nextCursor(rows, 3), null);
 assert.equal(olderThan({ id: '9', createdAt: '2026-11-07T00:00:00Z' }, cursor), true);
 assert.equal(olderThan({ id: 'b', createdAt: '2026-11-08T00:00:02Z' }, cursor), false);
 assert.match(feedFilter(cursor), /created_at\.lt\./);
+assert.equal(communityRoute({ pathname: '/community/discussion/', search: '' }).page, 'discussion');
+assert.equal(communityRoute({ pathname: '/community/profile/', search: '?id=11111111-1111-4111-8111-111111111111' }).page, 'profile');
+assert.equal(cleanDiscussion('<b>safe</b>').value, '<b>safe</b>');
+assert.equal(cleanDiscussion('x'.repeat(1001)).ok, false);
 
 const configText = readFileSync(new URL('./community-config.js', import.meta.url), 'utf8');
 assert.match(configText, /CHESS_SUPABASE_URL = ''/);

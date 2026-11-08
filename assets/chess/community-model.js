@@ -15,6 +15,14 @@ export function cleanName(value) {
   return { ok: true, value: name };
 }
 
+export function cleanDiscussion(value) {
+  const body = String(value || '').replace(/\r\n/g, '\n').trim();
+  if (!body) return { ok: false, error: 'Enter a message.' };
+  if (body.length > 1000) return { ok: false, error: 'A discussion message must be 1 to 1000 characters.' };
+  if (CONTROL.test(body)) return { ok: false, error: 'That text includes a character this community does not accept.' };
+  return { ok: true, value: body };
+}
+
 export function cleanBody(value) {
   const body = String(value || '').replace(/\r\n/g, '\n').trim();
   if (!body) return { ok: false, error: 'Enter some text.' };
@@ -53,6 +61,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function profilePath(id) {
   return '/community/profile/?id=' + encodeURIComponent(id);
+}
+
+export function communityRoute(location) {
+  const path = String(location.pathname || '').replace(/\/index\.html$/, '');
+  const normalized = path.endsWith('/') ? path : path + '/';
+  if (normalized === '/community/discussion/') return { page: 'discussion' };
+  return profileRoute(location);
 }
 
 export function profileRoute(location) {
