@@ -183,4 +183,63 @@ assert.equal(cursors[1], 'p1-19');
 assert.equal(cursors[4], 'p4-19');
 assert.match(burst.querySelector('#discussion-log').textContent, /burst 5/);
 
+const tie = '2026-11-08T00:00:00.000Z';
+const gapCalls = [];
+const gap = mount({
+  async profile() { return { id: ada, displayName: 'Ada' }; },
+  async listDiscussion(options) {
+    const cursor = options && options.after ? options.after.id : 'latest';
+    gapCalls.push(cursor);
+    if (cursor === 'latest') return { messages: [message('m1', 'one', tie)] };
+    if (cursor === 'm1') return { messages: [message('m2', 'two', tie), message('m3', 'three', tie), message('m4', 'four', tie)] };
+    return { messages: [] };
+  },
+  async sendDiscussion() { return message('m4', 'four', tie); }
+});
+await flush();
+const gapBox = gap.querySelector('#discussion-body');
+gapBox.value = 'four';
+gapBox.listeners.input();
+gap.querySelector('#discussion-send').listeners.click();
+await flush();
+await window.tick();
+assert.deepEqual(gapCalls.filter((cursor) => cursor !== 'latest'), ['m1']);
+assert.equal(gapCalls.includes('m4'), false);
+assert.deepEqual(gap.querySelector('#discussion-log').children.map((node) => node.textContent), ['Ada one', 'Ada two', 'Ada three', 'Ada four']);
+
+let releaseInitial;
+const initialGate = new Promise((resolve) => { releaseInitial = resolve; });
+const raceCalls = [];
+let latestReads = 0;
+const raced = mount({
+  async profile() { return { id: ada, displayName: 'Ada' }; },
+  async listDiscussion(options) {
+    const cursor = options && options.after ? options.after.id : 'latest';
+    raceCalls.push(cursor);
+    if (cursor === 'latest') {
+      latestReads += 1;
+      if (latestReads === 1) {
+        await initialGate;
+        return { messages: [message('m1', 'one', tie)] };
+      }
+      return { messages: [message('m4', 'four', tie)] };
+    }
+    if (cursor === 'm1') return { messages: [message('m2', 'two', tie), message('m3', 'three', tie), message('m4', 'four', tie)] };
+    return { messages: [] };
+  },
+  async sendDiscussion() { return message('m4', 'four', tie); }
+});
+await flush();
+const raceBox = raced.querySelector('#discussion-body');
+raceBox.value = 'four';
+raceBox.listeners.input();
+raced.querySelector('#discussion-send').listeners.click();
+await flush();
+const racePoll = window.tick();
+releaseInitial();
+await racePoll;
+assert.equal(latestReads, 1);
+assert.equal(raceCalls.includes('m4'), false);
+assert.deepEqual(raced.querySelector('#discussion-log').children.map((node) => node.textContent), ['Ada one', 'Ada two', 'Ada three', 'Ada four']);
+
 console.log('discussion room tests passed');

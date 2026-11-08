@@ -397,8 +397,24 @@ export function mountDiscussion(root, options) {
   let draftText = '';
   let draftAuthorId = null;
   let draining = false;
+  let pollCursor = null;
+  let initialSync = null;
   const seen = new Set();
   const pageSize = 20;
+
+  function laterCursor(left, right) {
+    const time = String(left.createdAt).localeCompare(String(right.createdAt));
+    if (time) return time > 0 ? left : right;
+    return String(left.id).localeCompare(String(right.id)) > 0 ? left : right;
+  }
+
+  function advancePollCursor(pageMessages) {
+    if (!pageMessages || !pageMessages.length) return;
+    let newest = pageMessages[0];
+    for (const item of pageMessages) newest = laterCursor(newest, item);
+    const next = { createdAt: newest.createdAt, id: newest.id };
+    if (!pollCursor || (laterCursor(next, pollCursor) === next && next.id !== pollCursor.id)) pollCursor = next;
+  }
 
   function remember(items) {
     items.forEach((item) => {
@@ -560,25 +576,44 @@ export function mountDiscussion(root, options) {
     paintStatus();
   }
 
+  function startInitial() {
+    if (initialSync) return initialSync;
+    initialSync = gateway.listDiscussion({ limit: pageSize }).then((page) => {
+      const rows = page.messages || [];
+      remember(rows);
+      advancePollCursor(rows);
+      paintMessages();
+      return page;
+    }).catch((err) => {
+      initialSync = null;
+      error = err && err.message ? err.message : 'The discussion could not be loaded.';
+      paintStatus();
+      throw err;
+    });
+    return initialSync;
+  }
+
   async function loadNew() {
     if (draining || document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
     draining = true;
     try {
+      await startInitial();
       let pages = 0;
       while (pages < 5) {
-        const newest = messages[messages.length - 1];
-        const page = await gateway.listDiscussion(newest
-          ? { after: { createdAt: newest.createdAt, id: newest.id }, limit: pageSize }
+        const page = await gateway.listDiscussion(pollCursor
+          ? { after: { createdAt: pollCursor.createdAt, id: pollCursor.id }, limit: pageSize }
           : { limit: pageSize });
         pages += 1;
-        if (!page.messages.length) break;
+        const rows = page.messages || [];
+        if (!rows.length) break;
         const beforeCount = messages.length;
-        remember(page.messages);
+        remember(rows);
+        advancePollCursor(rows);
         if (messages.length !== beforeCount) {
           paintMessages();
           paintStatus();
         }
-        if (page.messages.length < pageSize) break;
+        if (rows.length < pageSize) break;
       }
     } catch (err) { /* the next check tries again */ }
     finally { draining = false; }
@@ -587,10 +622,7 @@ export function mountDiscussion(root, options) {
   render();
   if (!options.configured || !gateway) return;
   gateway.profile().then((person) => { profile = person; paintComposer(); }).catch(() => { profile = null; paintComposer(); });
-  gateway.listDiscussion({ limit: pageSize }).then((page) => { remember(page.messages); paintMessages(); }).catch((err) => {
-    error = err && err.message ? err.message : 'The discussion could not be loaded.';
-    paintStatus();
-  });
+  startInitial();
   timer = window.setInterval(loadNew, 4000);
   window.addEventListener('pagehide', () => window.clearInterval(timer));
 }
