@@ -154,10 +154,38 @@ revoke all on function chess_service.profile_image(uuid, text) from public, anon
 revoke all on function chess_service.set_profile_bio(text, uuid, text) from public, anon, authenticated, chess_api;
 revoke all on function chess_service.set_profile_image(text, uuid, text, text, bytea) from public, anon, authenticated, chess_api;
 revoke all on function chess_service.clear_profile_image(text, uuid, text) from public, anon, authenticated, chess_api;
+
+drop function chess_service.chess_rename(text, text);
+
+create function chess_service.chess_rename(raw_token text, expected_author uuid, requested_name text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor uuid;
+  cleaned text;
+begin
+  actor := chess_private.as_profile(raw_token);
+  if expected_author is distinct from actor then
+    raise exception 'You can edit only your own Chess profile.';
+  end if;
+  cleaned := btrim(regexp_replace(coalesce(requested_name, ''), '\s+', ' ', 'g'));
+  if char_length(cleaned) < 1 or char_length(cleaned) > 40 or cleaned ~ '[[:cntrl:]]' then
+    raise exception 'Enter a display name of 1 to 40 characters.';
+  end if;
+  update public.chess_profiles profiles set display_name = cleaned where profiles.id = actor;
+  return jsonb_build_object('id', actor, 'displayName', cleaned);
+end;
+$$;
+
+revoke all on function chess_service.chess_rename(text, uuid, text) from public, anon, authenticated, chess_api;
 grant execute on function chess_service.profile(uuid) to chess_server;
 grant execute on function chess_service.profile_image(uuid, text) to chess_server;
 grant execute on function chess_service.set_profile_bio(text, uuid, text) to chess_server;
 grant execute on function chess_service.set_profile_image(text, uuid, text, text, bytea) to chess_server;
 grant execute on function chess_service.clear_profile_image(text, uuid, text) to chess_server;
+grant execute on function chess_service.chess_rename(text, uuid, text) to chess_server;
 
 commit;

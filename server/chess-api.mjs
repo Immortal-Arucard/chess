@@ -362,7 +362,8 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/profile/rename') {
-        const result = await query('select chess_service.chess_rename($1, $2) as profile', [token, body.displayName]);
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const result = await query('select chess_service.chess_rename($1, $2, $3) as profile', [token, authorId, body.displayName]);
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/discussion') {

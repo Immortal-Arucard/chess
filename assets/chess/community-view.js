@@ -198,7 +198,7 @@ export function mountCommunity(root, options) {
       const result = cleanName(name.value);
       if (!result.ok) { error = result.error; render(); return; }
       run(async () => {
-        profile = await gateway.saveProfile(result.value);
+        profile = await gateway.joinChess(result.value);
         notice = 'Chess profile saved. No other service was joined.';
         await loadFirst();
       });
@@ -234,8 +234,13 @@ export function mountCommunity(root, options) {
     renameButton.addEventListener('click', () => {
       const result = cleanName(rename.value);
       if (!result.ok) { error = result.error; render(); return; }
+      const editingId = profile.id;
       run(async () => {
-        profile = await gateway.saveProfile(result.value);
+        const session = await gateway.profile();
+        if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
+        const saved = await gateway.renameProfile(result.value, editingId);
+        if (!saved || saved.id !== editingId) throw new Error('You can edit only your own Chess profile.');
+        profile = Object.assign({}, profile, { displayName: saved.displayName });
       });
     });
     const tools = el('div', 'community-tools');
@@ -738,8 +743,12 @@ export function mountProfile(root, options) {
       button.addEventListener('click', () => {
         const result = cleanName(name.value);
         if (!result.ok) { error = result.error; render(); return; }
+        const editingId = person.id;
         load(async () => {
-          const saved = await gateway.saveProfile(result.value);
+          const session = await gateway.profile();
+          if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
+          const saved = await gateway.renameProfile(result.value, editingId);
+          if (!saved || saved.id !== editingId) throw new Error('You can edit only your own Chess profile.');
           person = Object.assign({}, person, { displayName: saved.displayName });
         });
       });
