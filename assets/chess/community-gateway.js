@@ -51,11 +51,10 @@ export function createChessGateway() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json', origin: location.origin },
-        body: JSON.stringify({ loginHint: email })
+        body: JSON.stringify({ email })
       });
       const body = await response.json();
-      if (!response.ok || !body.redirect) throw new Error(body.error || 'Sign-in could not start.');
-      location.assign(body.redirect);
+      if (!response.ok || body.sent !== true) throw new Error(body.error || 'Sign-in could not start.');
     },
     async signOut() {
       await send('/api/logout');
@@ -90,15 +89,26 @@ export function createChessGateway() {
       const posts = body.posts || [];
       return { posts, nextCursor: posts.length < limit ? null : { createdAt: posts[posts.length - 1].createdAt, id: posts[posts.length - 1].id } };
     },
-    async listPosts() {
-      const response = await fetch('/api/posts', { credentials: 'same-origin' });
+    async listPosts(options) {
+      const cursor = options && options.cursor;
+      const limit = options && options.limit ? options.limit : 20;
+      const query = new URLSearchParams({ limit: String(limit) });
+      if (cursor) {
+        query.set('before', cursor.createdAt);
+        query.set('beforeId', cursor.id);
+      }
+      const response = await fetch('/api/posts?' + query.toString(), { credentials: 'same-origin' });
       const body = await response.json();
-      return { posts: body.posts || [], nextCursor: null };
+      const posts = body.posts || [];
+      return { posts, nextCursor: posts.length < limit ? null : { createdAt: posts[posts.length - 1].createdAt, id: posts[posts.length - 1].id } };
     },
     async createPost(body) { await send('/api/posts', { body }); },
-    async listReplies(postId) {
-      const body = await send('/api/replies/list', { postId });
-      return { replies: body.replies || [], nextCursor: null };
+    async listReplies(postId, options) {
+      const cursor = options && options.cursor;
+      const limit = options && options.limit ? options.limit : 20;
+      const body = await send('/api/replies/list', { postId, before: cursor && cursor.createdAt, beforeId: cursor && cursor.id, limit });
+      const replies = body.replies || [];
+      return { replies, nextCursor: replies.length < limit ? null : { createdAt: replies[replies.length - 1].createdAt, id: replies[replies.length - 1].id } };
     },
     async createReply(postId, body) { await send('/api/replies', { postId, body }); },
     async deletePost(id) { await send('/api/posts/delete', { id }); },

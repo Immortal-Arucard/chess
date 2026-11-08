@@ -61,7 +61,55 @@ function boundedLimit(value) {
 }
 
 function clientIp(req) {
-  return String((req.socket && req.socket.remoteAddress) || '');
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf && !cf.includes(',')) return cf.trim();
+  const remote = String((req.socket && req.socket.remoteAddress) || '');
+  if (remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1') return remote;
+  return 'untrusted';
+}
+
+function publicError(error) {
+  const message = String((error && error.message) || '').split('\n')[0];
+  const allowed = [
+    'Sign-in could not start.',
+    'Sign-in could not be completed.',
+    'Sign-in expired.',
+    'This account is suspended.',
+    'Join Chess before doing that.',
+    'Sign in before joining Chess.',
+    'Sign in before doing that.',
+    'Enter a display name of 1 to 40 characters.',
+    'You can post only as your own Chess profile.',
+    'You can reply only as your own Chess profile.',
+    'You can delete only your own post.',
+    'You can delete only your own reply.',
+    'Only an admin can hide this.',
+    'This game was already saved with different moves.',
+    'This game belongs to a different Chess account.',
+    'A saved game must include every move.',
+    'Chess does not store a rated result.',
+    'The move list does not replay.',
+    'The PGN does not match the move list.',
+    'The PGN does not match the starting position.',
+    'The result does not match the position.',
+    'The starting position is missing.',
+    'The game record is incomplete.',
+    'The game record is too long.',
+    'That appearance is not one of the saved choices.',
+    'That engine target is not one of the saved choices.',
+    'The player side is missing.',
+    'The ending is not one this service stores.',
+    'A resignation needs a winner.',
+    'A finished position is not a resignation.',
+    'The request is too large.',
+    'The request origin is not this Chess site.',
+    'The security token did not match this session.',
+    'That profile was not found.',
+    'This account has reached the saved-game limit.'
+  ];
+  if (message.startsWith('Too many ') && message.length < 80) return message;
+  if (allowed.includes(message)) return message;
+  return 'The request could not be completed.';
 }
 
 async function readJson(req) {
@@ -92,6 +140,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         throw new Error('The Chess service connected as ' + who.rows[0].role + '.');
       }
       await client.query('begin');
+      await client.query("set local statement_timeout = '3s'");
       const result = await client.query(text, params);
       await client.query('commit');
       return result;
@@ -112,7 +161,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
     const sent = String(req.headers['x-csrf-token'] || '');
     const cookie = cookieValue(req.headers.cookie, CSRF_COOKIE);
     if (!sent || sent !== cookie) return false;
-    const result = await query('select public.chess_csrf_hash($1) as hash', [token]);
+    const result = await query('select chess_service.chess_csrf_hash($1) as hash', [token]);
     const expected = result.rows[0] && result.rows[0].hash;
     if (!expected) return false;
     const actual = createHash('sha256').update(sent).digest('hex');
@@ -136,7 +185,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const csrf = randomToken();
         const headers = { 'set-cookie': setCookie(CSRF_COOKIE, csrf, { httpOnly: false, maxAge: 600 }) };
         if (!token) return send(200, { authenticated: false, profile: null, configured: true }, headers);
-        const result = await query('select public.chess_session($1) as session', [token]);
+        const result = await query('select chess_service.chess_session($1) as session', [token]);
         const session = result.rows[0].session;
         return send(200, Object.assign({ configured: true }, session));
       }
@@ -162,9 +211,9 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, { posts: result.rows[0].posts, limit });
       }
       if (req.method === 'GET' && url.pathname === '/api/auth/callback') {
-        const state = String(url.searchParams.get('auth_state') || '');
+        const state = cookieValue(req.headers.cookie, STATE_COOKIE);
         const code = String(url.searchParams.get('code') || '');
-        const cookieState = cookieValue(req.headers.cookie, STATE_COOKIE);
+        const cookieState = state;
         const fail = (status, error) => {
           res.writeHead(status, Object.assign({
             location: origin + '/community/',
@@ -178,7 +227,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         if (!state || state !== cookieState || !code) return fail(303, 'Sign-in could not be completed.');
         const consumed = await query('select verifier, redirect_uri from chess_service.consume_auth($1)', [state]);
         const row = consumed.rows[0];
-        if (!row || row.redirect_uri !== origin + '/api/auth/callback?auth_state=' + state) return fail(303, 'Sign-in expired.');
+        if (!row || row.redirect_uri !== origin + '/api/auth/callback') return fail(303, 'Sign-in expired.');
         const exchange = await master.exchange({ code, verifier: row.verifier });
         if (!exchange || exchange.audience !== 'authenticated' || !exchange.masterId) return fail(303, 'Sign-in could not be completed.');
         const sessionToken = randomToken();
@@ -204,7 +253,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const state = randomToken();
         const verifier = randomToken();
         const challenge = codeChallenge(verifier);
-        const redirectTo = origin + '/api/auth/callback?auth_state=' + encodeURIComponent(state);
+        const redirectTo = origin + '/api/auth/callback';
         await query('select chess_service.begin_sign_in($1, $2, $3, $4, $5, $6)', [
           email, state, verifier, challenge, redirectTo, clientIp(req)
         ]);
@@ -214,69 +263,69 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         });
       }
       if (!token) return send(401, { error: 'Sign in before doing that.' });
-      const sessionCheck = await query('select public.chess_session($1) as session', [token]);
+      const sessionCheck = await query('select chess_service.chess_session($1) as session', [token]);
       if (!sessionCheck.rows[0].session.authenticated) return send(401, { error: 'Sign in before doing that.' });
       if (!(await csrfOk(req, token))) return send(403, { error: 'The security token did not match this session.' });
       const body = await readJson(req);
       if (url.pathname === '/api/logout') {
-        await query('select public.chess_logout($1)', [token]);
+        await query('select chess_service.chess_logout($1)', [token]);
         return send(200, { authenticated: false }, { 'set-cookie': clearCookies() });
       }
       if (url.pathname === '/api/join') {
-        const result = await query('select public.chess_join($1, $2) as profile', [token, body.displayName]);
+        const result = await query('select chess_service.chess_join($1, $2) as profile', [token, body.displayName]);
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/profile/rename') {
-        const result = await query('select public.chess_rename($1, $2) as profile', [token, body.displayName]);
+        const result = await query('select chess_service.chess_rename($1, $2) as profile', [token, body.displayName]);
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/posts') {
-        const result = await query('select public.chess_create_post($1, $2) as post', [token, body.body]);
+        const result = await query('select chess_service.chess_create_post($1, $2) as post', [token, body.body]);
         return send(200, result.rows[0].post);
       }
       if (url.pathname === '/api/posts/delete') {
-        const result = await query('select public.chess_delete_post($1, $2) as deleted', [token, body.id]);
+        const result = await query('select chess_service.chess_delete_post($1, $2) as deleted', [token, body.id]);
         return send(200, result.rows[0].deleted);
       }
       if (url.pathname === '/api/replies') {
-        const result = await query('select public.chess_create_reply($1, $2, $3) as reply', [token, body.postId, body.body]);
+        const result = await query('select chess_service.chess_create_reply($1, $2, $3) as reply', [token, body.postId, body.body]);
         return send(200, result.rows[0].reply);
       }
       if (url.pathname === '/api/replies/list') {
-        const result = await query('select public.chess_replies($1, $2) as replies', [token, body.postId]);
+        const result = await query('select chess_service.chess_replies($1, $2) as replies', [token, body.postId]);
         return send(200, { replies: result.rows[0].replies });
       }
       if (url.pathname === '/api/replies/delete') {
-        const result = await query('select public.chess_delete_reply($1, $2) as deleted', [token, body.id]);
+        const result = await query('select chess_service.chess_delete_reply($1, $2) as deleted', [token, body.id]);
         return send(200, result.rows[0].deleted);
       }
       if (url.pathname === '/api/reports') {
-        const result = await query('select public.chess_report($1, $2, $3, $4) as report', [token, body.postId || null, body.replyId || null, body.reason]);
+        const result = await query('select chess_service.chess_report($1, $2, $3, $4) as report', [token, body.postId || null, body.replyId || null, body.reason]);
         return send(200, result.rows[0].report);
       }
       if (url.pathname === '/api/moderate/hide') {
-        const result = await query('select public.chess_hide_post($1, $2) as hidden', [token, body.id]);
+        const result = await query('select chess_service.chess_hide_post($1, $2) as hidden', [token, body.id]);
         return send(200, result.rows[0].hidden);
       }
       if (url.pathname === '/api/settings') {
         const result = body.autoSaveBotResults === undefined
-          ? await query('select public.chess_settings($1) as settings', [token])
-          : await query('select public.chess_settings_set($1, $2) as settings', [token, body.autoSaveBotResults === true]);
+          ? await query('select chess_service.chess_settings($1) as settings', [token])
+          : await query('select chess_service.chess_settings_set($1, $2) as settings', [token, body.autoSaveBotResults === true]);
         return send(200, result.rows[0].settings);
       }
       if (url.pathname === '/api/games') {
         const hash = validateGame(body);
+        if (!body.expectedProfileId) throw new Error('This game belongs to a different Chess account.');
         const result = await query('select chess_service.save_game($1, $2::jsonb, $3) as saved', [token, JSON.stringify(body), hash]);
         return send(200, result.rows[0].saved);
       }
       if (url.pathname === '/api/games/list') {
-        const result = await query('select public.chess_games($1) as games', [token]);
+        const result = await query('select chess_service.chess_games($1) as games', [token]);
         return send(200, { games: result.rows[0].games });
       }
       return send(404, { error: 'Not found.' });
     } catch (error) {
-      const message = error && error.message ? String(error.message).split('\n')[0] : 'The request failed.';
-      return send(400, { error: message.replace(/^error:\s*/i, '') });
+      return send(400, { error: publicError(error) });
     }
   }
 

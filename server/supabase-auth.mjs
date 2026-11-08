@@ -14,11 +14,8 @@ export function createSupabaseAuth({ url, apiKey, fetchImpl, expectedAudience = 
   const fetchFn = fetchImpl;
   async function call(path, options) {
     const endpoint = new URL(path, base + '/');
-    const headers = Object.assign({
-      apikey: apiKey,
-      authorization: 'Bearer ' + (options.bearer || apiKey),
-      'content-type': 'application/json'
-    }, options.headers || {});
+    const headers = { apikey: apiKey, 'content-type': 'application/json' };
+    if (options.bearer) headers.authorization = 'Bearer ' + options.bearer;
     return fetchFn(endpoint, {
       method: options.method,
       headers,
@@ -55,8 +52,7 @@ export function createSupabaseAuth({ url, apiKey, fetchImpl, expectedAudience = 
       if (!userResponse.ok || !user.id || !payload || payload.sub !== user.id) return null;
       const audience = Array.isArray(payload.aud) ? payload.aud[0] : payload.aud;
       if (audience !== expectedAudience) return null;
-      const issuer = String(payload.iss || '');
-      if (issuer && !issuer.startsWith(base)) return null;
+      if (payload.iss !== base + '/auth/v1') return null;
       return { masterId: user.id, audience };
     }
   };

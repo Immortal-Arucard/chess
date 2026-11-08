@@ -148,9 +148,16 @@ const device = rememberDeviceRecovery({ setItem(_key, value) { this.value = valu
   player: 'w',
   clientGameId: castle.id,
   record: castle,
-  discardedIds: []
+  discardedIds: [],
+  savedStatus: 'saved',
+  accountId: 'profile-a',
+  ownerAtStart: 'profile-a',
+  prefs: { elo: 1600 }
 });
 assert.equal(device.accountSave, false);
+assert.equal(device.savedStatus, 'saved');
+assert.equal(device.accountId, 'profile-a');
+assert.equal(device.ownerAtStart, 'profile-a');
 assert.match(device.note, /Not an account save/);
 assert.equal(device.record.pgn, castle.pgn);
 

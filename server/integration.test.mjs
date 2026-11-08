@@ -15,6 +15,12 @@ const adaMaster = '11111111-1111-4111-8111-111111111111';
 const bobMaster = '22222222-2222-4222-8222-222222222222';
 const masterSecret = 'master-access-token-should-never-leak';
 
+function psqlFile(database, file) {
+  const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1', '-f', file], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1', '-f', file], process.env];
+  const result = spawnSync(command[0], command[1], { encoding: 'utf8', env: command[2] });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+}
+
 function psql(database, sql) {
   const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1'], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1'], process.env];
   const result = spawnSync(command[0], command[1], { input: sql, encoding: 'utf8', env: command[2] });
@@ -33,9 +39,7 @@ function setup() {
     create schema if not exists extensions;
     create extension if not exists pgcrypto schema extensions;
   `);
-  psql(db, readFileSync(new URL('../supabase/chess_community.sql', import.meta.url), 'utf8'));
-  psql(db, readFileSync(new URL('../supabase/chess_service.sql', import.meta.url), 'utf8'));
-  psql(db, readFileSync(new URL('../supabase/chess_http.sql', import.meta.url), 'utf8'));
+  psqlFile(db, 'supabase/chess_release.sql');
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;
@@ -94,12 +98,22 @@ function startMaster() {
     for await (const chunk of req) chunks.push(chunk);
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
     if (req.method === 'POST' && url.pathname === '/auth/v1/otp') {
+      if (req.headers.authorization) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"bearer"}');
+        return;
+      }
       challenges.set(body.code_challenge, { email: body.email, redirect: url.searchParams.get('redirect_to'), used: false });
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end('{}');
       return;
     }
     if (req.method === 'POST' && url.pathname === '/auth/v1/token') {
+      if (req.headers.authorization) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"bearer"}');
+        return;
+      }
       const challenge = codeChallenge(body.code_verifier || '');
       const row = challenges.get(challenge);
       if (!row || row.used || body.auth_code !== row.code) {
@@ -145,7 +159,7 @@ const pool = new Pool({ host: '127.0.0.1', port: 5432, user: 'chess_server', pas
 const denied = await pool.query("select has_table_privilege('chess_server', 'chess_private.profile_owners', 'select') as owners, has_table_privilege('chess_server', 'public.chess_posts', 'truncate') as trunc");
 assert.equal(denied.rows[0].owners, false);
 assert.equal(denied.rows[0].trunc, false);
-await pool.query('select public.chess_cleanup()');
+await pool.query('select chess_service.chess_cleanup()');
 const live = createChessApp({
   pool,
   origin,
@@ -167,7 +181,8 @@ async function signIn(appPort, jar, masterId) {
   const code = randomToken();
   master.challenges.get(challenge).code = code;
   master.challenges.get(challenge).masterId = masterId;
-  const callback = await request(appPort, jar, 'GET', '/api/auth/callback?auth_state=' + encodeURIComponent(state) + '&code=' + encodeURIComponent(code));
+  assert.equal(master.challenges.get(challenge).redirect, origin + '/api/auth/callback');
+  const callback = await request(appPort, jar, 'GET', '/api/auth/callback?code=' + encodeURIComponent(code));
   assert.equal(callback.status, 303, callback.text);
   assert.equal(callback.location, origin + '/community/');
   assert.equal(callback.text.includes(code), false);
@@ -234,6 +249,7 @@ const record = {
   opponentName: 'Stockfish 19 Lite',
   opponentUciElo: 1600,
   rated: false,
+  expectedProfileId: adaJoin.json.id,
   pieceStyle: 'standard',
   pieceColor: 'ink',
   palette: 'midnight'
@@ -286,7 +302,7 @@ const replayed = await request(port, ada, 'POST', '/api/posts', { body: 'after l
 assert.equal(replayed.status, 401);
 const setting = await pool.query("select current_setting('chess.profile_id', true) as profile");
 assert.equal(setting.rows[0].profile || '', '');
-const revoked = await pool.query("select has_function_privilege('chess_server', 'chess_service.revoke_master(uuid)', 'execute') as allowed");
+const revoked = await pool.query("select has_function_privilege('chess_server', 'chess_service.chess_revoke_master(uuid)', 'execute') as allowed");
 assert.equal(revoked.rows[0].allowed, false);
 live.server.close();
 master.server.close();

@@ -16,7 +16,11 @@ export function deviceRecoveryRecord(snapshot) {
     manualResult: snapshot.manualResult || null,
     clientGameId: snapshot.clientGameId,
     record: snapshot.record || null,
-    discardedIds: snapshot.discardedIds || []
+    discardedIds: snapshot.discardedIds || [],
+    savedStatus: snapshot.savedStatus || 'unsaved',
+    accountId: snapshot.accountId || null,
+    ownerAtStart: snapshot.ownerAtStart || null,
+    prefs: snapshot.prefs || null
   };
 }
 

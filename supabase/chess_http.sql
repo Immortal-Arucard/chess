@@ -184,6 +184,9 @@ declare
   game_id uuid := (payload->>'clientGameId')::uuid;
 begin
   actor := chess_private.as_profile(raw_token);
+  if (payload->>'expectedProfileId') is null or (payload->>'expectedProfileId')::uuid is distinct from actor then
+    raise exception 'This game belongs to a different Chess account.';
+  end if;
   perform pg_advisory_xact_lock(hashtextextended(actor::text || ':' || game_id::text, 0));
   if coalesce(payload->>'rated', 'false') <> 'false' or game_hash is null or char_length(game_hash) <> 64 then
     raise exception 'Chess does not store a rated result.';
@@ -234,5 +237,54 @@ grant execute on function chess_service.revoke_master(uuid) to chess_authority;
 revoke all on function public.chess_accept_login(uuid, text, text) from chess_server;
 revoke all on function public.chess_revoke_master(uuid) from chess_server;
 drop function if exists public.chess_rotate(text, text, text);
+
+drop function if exists chess_service.revoke_master(uuid);
+drop function if exists chess_service.cleanup();
+alter function public.chess_revoke_master(uuid) set schema chess_service;
+alter function public.chess_cleanup() set schema chess_service;
+alter function public.chess_session(text) set schema chess_service;
+alter function public.chess_csrf_hash(text) set schema chess_service;
+alter function public.chess_join(text, text) set schema chess_service;
+alter function public.chess_rename(text, text) set schema chess_service;
+alter function public.chess_logout(text) set schema chess_service;
+alter function public.chess_create_post(text, text) set schema chess_service;
+alter function public.chess_delete_post(text, uuid) set schema chess_service;
+alter function public.chess_create_reply(text, uuid, text) set schema chess_service;
+alter function public.chess_delete_reply(text, uuid) set schema chess_service;
+alter function public.chess_report(text, uuid, uuid, text) set schema chess_service;
+alter function public.chess_hide_post(text, uuid) set schema chess_service;
+alter function public.chess_settings(text) set schema chess_service;
+alter function public.chess_settings_set(text, boolean) set schema chess_service;
+alter function public.chess_games(text) set schema chess_service;
+alter function public.chess_replies(text, uuid) set schema chess_service;
+alter function public.chess_posts(text, timestamptz, uuid, integer) set schema chess_service;
+
+drop function if exists public.chess_finish_material(text);
+drop function if exists public.chess_begin_auth(text, text, text, text, text, text);
+drop function if exists public.chess_take_auth(text);
+drop function if exists public.chess_keep_code(text, text, text);
+drop function if exists public.chess_take_code(text);
+drop function if exists public.chess_accept_login(uuid, text, text);
+drop function if exists public.chess_save_game(text, jsonb);
+
+revoke all on function chess_service.chess_revoke_master(uuid) from public, anon, authenticated, chess_api, chess_server;
+grant execute on function chess_service.chess_revoke_master(uuid) to chess_authority;
+grant execute on function chess_service.chess_cleanup() to chess_server;
+grant execute on function chess_service.chess_session(text) to chess_server;
+grant execute on function chess_service.chess_csrf_hash(text) to chess_server;
+grant execute on function chess_service.chess_join(text, text) to chess_server;
+grant execute on function chess_service.chess_rename(text, text) to chess_server;
+grant execute on function chess_service.chess_logout(text) to chess_server;
+grant execute on function chess_service.chess_create_post(text, text) to chess_server;
+grant execute on function chess_service.chess_delete_post(text, uuid) to chess_server;
+grant execute on function chess_service.chess_create_reply(text, uuid, text) to chess_server;
+grant execute on function chess_service.chess_delete_reply(text, uuid) to chess_server;
+grant execute on function chess_service.chess_report(text, uuid, uuid, text) to chess_server;
+grant execute on function chess_service.chess_hide_post(text, uuid) to chess_server;
+grant execute on function chess_service.chess_settings(text) to chess_server;
+grant execute on function chess_service.chess_settings_set(text, boolean) to chess_server;
+grant execute on function chess_service.chess_games(text) to chess_server;
+grant execute on function chess_service.chess_replies(text, uuid) to chess_server;
+grant execute on function chess_service.chess_posts(text, timestamptz, uuid, integer) to chess_server;
 
 commit;

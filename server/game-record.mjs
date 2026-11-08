@@ -57,6 +57,11 @@ export function validateGame(record) {
       throw new Error('The move list does not replay.');
     }
   });
+  const fenHeader = /\[FEN "([^"]+)"\]/.exec(record.pgn);
+  const declaredStart = fenHeader ? fenHeader[1] : STANDARD_FEN;
+  if (declaredStart !== (record.startFen || STANDARD_FEN)) {
+    throw new Error('The PGN does not match the starting position.');
+  }
   const loaded = new Chess();
   loaded.loadPgn(record.pgn);
   const replay = loaded.history({ verbose: true });
@@ -66,8 +71,13 @@ export function validateGame(record) {
   replay.forEach((move, index) => {
     if (move.san !== record.moves[index].san) throw new Error('The PGN does not match the move list.');
   });
-  if ((record.startFen || STANDARD_FEN) !== STANDARD_FEN && loaded.getHeaders().FEN !== record.startFen) {
+  const headerFen = loaded.getHeaders().FEN || STANDARD_FEN;
+  if (headerFen !== (record.startFen || STANDARD_FEN)) {
     throw new Error('The PGN does not match the starting position.');
+  }
+  const finalFen = game.fen();
+  if (loaded.fen() !== finalFen || record.moves[record.moves.length - 1].fen !== finalFen) {
+    throw new Error('The PGN does not match the move list.');
   }
   const mateResult = game.isCheckmate() ? (game.turn() === 'w' ? '0-1' : '1-0') : null;
   const drawResult = !mateResult && game.isDraw() ? '1/2-1/2' : null;
