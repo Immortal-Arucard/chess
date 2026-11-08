@@ -1,0 +1,4 @@
+assets/vendor/supabase.js is the same browser build already published by the Compass site.
+It is the @supabase/supabase-js UMD bundle. That package is MIT licensed.
+The Chess page loads it only after a publishable key is placed in assets/chess/community-config.js.
+Do not replace this file with a build that embeds a service-role key.

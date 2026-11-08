@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/chess/community.css">
 
 </head>
 <body class="sheet">
@@ -37,12 +38,11 @@
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Community</span></li></ol></nav>
 <main class="page" id="main">
-  <p class="eyebrow">Planned. Not operational.</p>
+  <p class="eyebrow">Shared posts</p>
   <h1>Community</h1>
-  <div class="prose">
-    <p>This page is reserved for a chess community, a small social network connected to the marketplace and the exchange.</p>
-    <p>No profiles, posts, or members are shown. The page is planned and is not operational.</p>
-  </div>
+  <p class="lead">A small place for signed-in display names, posts, and replies.</p>
+  <noscript><p>Community sign-in needs JavaScript. No posts are shown.</p></noscript>
+  <div id="community-app"></div>
   <nav class="page-nav" aria-label="Related">
   <h2>Related</h2>
   <ul class="children">
@@ -75,5 +75,6 @@
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <script src="/assets/site.js"></script>
+<script type="module" src="/assets/chess/community-app.js"></script>
 </body>
 </html>

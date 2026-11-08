@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan } from './community-model.js';
+import { assertPublishable, communityConfig } from './community-config.js';
+
+const name = cleanName('  Ada  Lovelace ');
+assert.equal(name.ok && name.value, 'Ada Lovelace');
+assert.equal(cleanName('').ok, false);
+assert.equal(cleanName('a'.repeat(41)).ok, false);
+assert.equal(cleanName('Ada\nLovelace').value, 'Ada Lovelace');
+assert.equal(cleanName('Ada\u0007Lovelace').ok, false);
+
+const body = cleanBody('  Hello\nboard  ');
+assert.equal(body.ok && body.value, 'Hello\nboard');
+assert.equal(cleanBody('   ').ok, false);
+assert.equal(cleanBody('x'.repeat(2001)).ok, false);
+assert.equal(cleanBody('ok\u0000no').ok, false);
+assert.equal(cleanReason('spam').ok && cleanReason('spam').value, 'spam');
+assert.equal(cleanReason('').ok, false);
+
+const rows = [
+  { id: 'b', createdAt: '2026-11-08T00:00:02Z' },
+  { id: 'a', createdAt: '2026-11-08T00:00:01Z' }
+];
+const cursor = nextCursor(rows, 2);
+assert.deepEqual(cursor, { createdAt: '2026-11-08T00:00:01Z', id: 'a' });
+assert.equal(nextCursor(rows, 3), null);
+assert.equal(olderThan({ id: '9', createdAt: '2026-11-07T00:00:00Z' }, cursor), true);
+assert.equal(olderThan({ id: 'b', createdAt: '2026-11-08T00:00:02Z' }, cursor), false);
+assert.match(feedFilter(cursor), /created_at\.lt\./);
+
+const configText = readFileSync(new URL('./community-config.js', import.meta.url), 'utf8');
+assert.match(configText, /CHESS_SUPABASE_URL = ''/);
+assert.match(configText, /CHESS_SUPABASE_PUBLISHABLE_KEY = ''/);
+assert.equal(configText.includes('service_role'), true);
+assert.equal(communityConfig().configured, false);
+assert.throws(() => assertPublishable('header.payload.service_role'), /Refusing/);
+const serviceJwt = 'aaa.' + Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url') + '.bbb';
+assert.throws(() => assertPublishable(serviceJwt), /Refusing/);
+assert.doesNotThrow(() => assertPublishable('sb_publishable_example'));
+
+const sql = readFileSync(new URL('../../supabase/chess_community.sql', import.meta.url), 'utf8');
+for (const table of ['chess_profiles', 'chess_admins', 'chess_posts', 'chess_replies', 'chess_reports']) {
+  assert.match(sql, new RegExp('alter table public\\.' + table + ' enable row level security'));
+  assert.match(sql, new RegExp('alter table public\\.' + table + ' force row level security'));
+}
+assert.equal(sql.includes('public.profiles'), false);
+assert.equal(sql.includes('public.results'), false);
+assert.doesNotMatch(sql, /table public\.test_events|from public\.test_events/);
+assert.equal(sql.includes('service_role'), true);
+assert.doesNotMatch(sql, /eyJ[A-Za-z0-9_-]{20,}/);
+
+const users = {
+  ada: { id: 'ada', name: 'Ada' },
+  bob: { id: 'bob', name: 'Bob' }
+};
+let current = users.ada;
+const posts = [];
+function createPost(author, text) {
+  const cleaned = cleanBody(text);
+  if (!cleaned.ok) throw new Error(cleaned.error);
+  const row = { id: String(posts.length + 1), authorId: author.id, authorName: author.name, body: cleaned.value, createdAt: new Date(Date.UTC(2026, 10, 8, 0, 0, posts.length)).toISOString() };
+  posts.unshift(row);
+  return row;
+}
+function deletePost(actor, id) {
+  const row = posts.find((item) => item.id === id);
+  if (!row || row.authorId !== actor.id) throw new Error('You can delete only your own post.');
+  posts.splice(posts.indexOf(row), 1);
+}
+createPost(users.ada, 'Hello <script>alert(1)</script>');
+assert.throws(() => deletePost(users.bob, posts[0].id), /only your own post/);
+deletePost(users.ada, posts[0].id);
+assert.equal(posts.length, 0);
+
+console.log('community model tests passed');
