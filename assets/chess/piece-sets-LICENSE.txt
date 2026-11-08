@@ -1,0 +1,30 @@
+Standard piece drawings
+=======================
+
+The Standard set is the Cburnett chess piece set from Wikimedia Commons,
+drawn by Colin M.L. Burnett (Wikimedia user Cburnett).
+
+Source files:
+https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces
+https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg
+https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg
+https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg
+https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg
+https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_nlt45.svg
+https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg
+
+License: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)
+https://creativecommons.org/licenses/by-sa/3.0/
+
+The files on Wikimedia Commons are also described under the GNU Free
+Documentation License and the BSD license. This copy is included under
+CC BY-SA 3.0. Attribution: Colin M.L. Burnett (Cburnett).
+
+The paths are recolored in the app for the ink, ivory, and sky piece colors.
+The shapes are otherwise the Cburnett drawings.
+
+Bold and Contour
+================
+
+Bold and Contour are original silhouettes drawn for this project. They are
+not the Cburnett set. Contour is an outline treatment of the Bold silhouettes.

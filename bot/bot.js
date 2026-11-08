@@ -1,5 +1,13 @@
 import { Chess } from '/assets/vendor/chess.js/chess.js';
 import { mountBoard } from '/assets/chess/board.js';
+import { ELO_CHOICES, PALETTES, PIECE_COLORS, PIECE_STYLES, SEARCH_MS, loadPrefs, pieceColors, savePrefs, strengthNote } from '/assets/chess/bot-prefs.js';
+import {
+  accountSettingsView,
+  applySave,
+  buildGameRecord,
+  createResultBook,
+  loadAutoSavePreference
+} from '/assets/chess/bot-results.js';
 import { createEngine } from '/assets/chess/engine.js';
 import { applyUci, kingSquare, legalTargets, outcome, pieceMap, pgnFor, promotionMoves } from '/assets/chess/rules.js';
 
@@ -11,22 +19,40 @@ const engineEl = document.getElementById('engine-status');
 const movesEl = document.getElementById('moves');
 const pgnEl = document.getElementById('pgn');
 const promotionEl = document.getElementById('promotion');
-const boardApi = mountBoard(document.getElementById('board'), onSquare);
+const windowEl = document.getElementById('game-window');
+const endPanel = document.getElementById('end-panel');
+const saveStatus = document.getElementById('save-status');
+const saveDetail = document.getElementById('save-detail');
+const setupStatus = document.getElementById('setup-status');
+const leavePrompt = document.getElementById('leave-prompt');
+const autoBox = document.getElementById('autosave-bot');
+const autoNote = document.getElementById('autosave-note');
+const boardEl = document.getElementById('board');
+const boardApi = mountBoard(boardEl, onSquare);
 
 const engine = createEngine(ENGINE_URL);
+const book = createResultBook();
 let chess = new Chess();
 let player = 'w';
-let movetime = 500;
+let prefs = loadPrefs(localStorage);
 let selected = null;
 let pendingPromotion = null;
 let manualResult = null;
 let lastMove = null;
 let engineReady = false;
 let notice = '';
+let phase = 'setup';
+let startFen = chess.fen();
+let pending = null;
+let leaveAction = '';
 
 const params = new URLSearchParams(location.search);
 const reviewFen = params.get('review') === '1' ? params.get('fen') : '';
 if (params.get('play') === 'b' || params.get('play') === 'w') player = params.get('play');
+
+function currentAccount() {
+  return { available: false, id: null };
+}
 
 function today() {
   const now = new Date();
@@ -49,15 +75,50 @@ function resultCode(state) {
   return '1/2-1/2';
 }
 
+function freshChess() {
+  const game = new Chess();
+  if (reviewFen) {
+    try {
+      game.load(reviewFen);
+    } catch (err) {
+      notice = 'That position could not be loaded.';
+    }
+  }
+  return game;
+}
+
+function placeBoard(inGame) {
+  document.getElementById(inGame ? 'board-mount' : 'board-preview').append(boardEl);
+}
+
+function unsavedFinished() {
+  return phase === 'ended' && pending && pending.status !== 'saved';
+}
+
+function syncAccountSettings() {
+  const view = accountSettingsView(currentAccount());
+  autoBox.checked = view.checked;
+  autoBox.disabled = view.disabled;
+  autoNote.textContent = view.note;
+}
+
 function render() {
   const state = outcome(chess);
-  const interactive = engineReady && !state.over && !manualResult && chess.turn() === player && !engineEl.dataset.thinking;
+  if (phase === 'playing' && (state.over || manualResult)) {
+    enterEnded();
+    return;
+  }
+  const interactive = phase === 'playing' && engineReady && !state.over && !manualResult && chess.turn() === player && !engineEl.dataset.thinking;
   const legal = selected ? legalTargets(chess, selected) : [];
   boardApi.render({
     orientation: player,
     pieces: pieceMap(chess),
     selected,
     legal: interactive ? legal : [],
+    palette: prefs.palette,
+    pieceStyle: prefs.pieceStyle,
+    pieceColor: prefs.pieceColor,
+    pieceColors: pieceColors(prefs.pieceColor),
     checkSquare: state.check ? kingSquare(chess, chess.turn()) : null,
     lastMove,
     interactive
@@ -65,8 +126,9 @@ function render() {
   let text = manualResult
     ? (manualResult === '1-0' ? 'White wins by resignation.' : 'Black wins by resignation.')
     : state.text;
-  if (!manualResult && !state.over && chess.turn() !== player && engineReady) text = 'Bot is thinking.';
-  if (!engineReady && !engineEl.dataset.failed) text = 'Waiting for the engine.';
+  if (phase === 'setup') text = 'Press Start game to play. No moves are made until then.';
+  else if (!manualResult && !state.over && chess.turn() !== player && engineReady && phase === 'playing') text = 'Bot is thinking.';
+  else if (!engineReady && !engineEl.dataset.failed && phase !== 'setup') text = 'Waiting for the engine.';
   statusEl.textContent = notice || text;
   const history = chess.history();
   movesEl.replaceChildren();
@@ -76,7 +138,7 @@ function render() {
     movesEl.append(item);
   }
   const who = names();
-  pgnEl.value = pgnFor(chess, {
+  const livePgn = pgnFor(chess, {
     event: 'Bot chess',
     site: SITE,
     date: today(),
@@ -84,9 +146,29 @@ function render() {
     black: who.black,
     result: resultCode(state)
   });
+  pgnEl.value = pending && pending.record ? pending.record.pgn : livePgn;
   document.getElementById('play-white').setAttribute('aria-pressed', player === 'w' ? 'true' : 'false');
   document.getElementById('play-black').setAttribute('aria-pressed', player === 'b' ? 'true' : 'false');
-  document.getElementById('resign').disabled = state.over || !!manualResult || chess.history().length === 0;
+  document.getElementById('resign').disabled = phase !== 'playing';
+  document.body.dataset.phase = phase;
+  windowEl.hidden = phase === 'setup';
+  document.body.classList.toggle('game-open', phase !== 'setup');
+  endPanel.hidden = phase !== 'ended';
+  if (phase === 'ended' && pending) {
+    const count = pending.record ? pending.record.moves.length : history.length;
+    saveStatus.dataset.state = 'unsaved';
+    saveStatus.textContent = 'Not saved to an account. ' + count + (count === 1 ? ' move is' : ' moves are') + ' still in this record.';
+    saveDetail.textContent = pending.error || notice || '';
+  } else {
+    saveStatus.dataset.state = '';
+    saveStatus.textContent = '';
+    saveDetail.textContent = '';
+  }
+  const summary = names();
+  document.getElementById('game-summary').textContent = summary.white + ' vs ' + summary.black + '. Bot limit ' + prefs.elo + ', an uncalibrated engine target.';
+  setupStatus.textContent = notice && phase === 'setup'
+    ? notice
+    : 'Choose a color, bot limit, and appearance, then start the game. Pieces stay where they are until you start.';
 }
 
 function showPromotion(from, to) {
@@ -101,16 +183,59 @@ function hidePromotion() {
   promotionEl.hidden = true;
 }
 
+function enterEnded() {
+  if (phase === 'ended') return;
+  phase = 'ended';
+  hidePromotion();
+  selected = null;
+  const state = outcome(chess);
+  const who = names();
+  let record = null;
+  let error = '';
+  try {
+    record = buildGameRecord({
+      id: crypto.randomUUID(),
+      startFen,
+      sans: chess.history(),
+      result: resultCode(state),
+      termination: manualResult ? 'resign' : state.kind,
+      playerColor: player === 'w' ? 'white' : 'black',
+      opponentName: 'Stockfish 19 Lite',
+      opponentUciElo: prefs.elo,
+      white: who.white,
+      black: who.black,
+      event: 'Bot chess',
+      site: SITE,
+      date: today(),
+      boundAccountId: currentAccount().id
+    });
+  } catch (err) {
+    error = 'The full game record could not be built, so it was not saved.';
+  }
+  pending = { record, status: 'unsaved', error, accountId: null };
+  if (record) {
+    const account = currentAccount();
+    const decision = applySave('auto', account, loadAutoSavePreference(account), record, book);
+    pending.status = decision.status;
+    pending.error = decision.error || error;
+    pending.accountId = decision.accountId;
+    pending.record = decision.record;
+  }
+  notice = '';
+  render();
+}
+
 function finishHumanMove(played) {
   selected = null;
   lastMove = { from: played.from, to: played.to };
   hidePromotion();
-  const state = outcome(chess);
+  notice = '';
   render();
-  if (!state.over) requestBot();
+  if (phase === 'playing') requestBot();
 }
 
 function tryMove(from, to, promotion) {
+  if (phase !== 'playing') return;
   const choices = promotionMoves(chess, from, to);
   if (choices.length && !promotion) {
     showPromotion(from, to);
@@ -127,11 +252,11 @@ function tryMove(from, to, promotion) {
     render();
     return;
   }
-  notice = '';
   finishHumanMove(played);
 }
 
 function onSquare(square) {
+  if (phase !== 'playing') return;
   const state = outcome(chess);
   if (!engineReady || state.over || manualResult || chess.turn() !== player || engineEl.dataset.thinking) return;
   const piece = chess.get(square);
@@ -151,37 +276,74 @@ function onSquare(square) {
 }
 
 function requestBot() {
+  if (phase !== 'playing') return;
   const state = outcome(chess);
   if (manualResult || state.over || chess.turn() === player) return;
   if (!engine.ready) return;
   engineEl.dataset.thinking = 'true';
   render();
-  const started = engine.search(chess.fen(), movetime);
+  const started = engine.search(chess.fen(), SEARCH_MS, prefs.elo);
   if (!started) {
     delete engineEl.dataset.thinking;
     render();
   }
 }
 
-function newGame() {
+function returnToSetup() {
+  engine.cancel();
+  delete engineEl.dataset.thinking;
+  hidePromotion();
+  leavePrompt.hidden = true;
+  leaveAction = '';
+  selected = null;
+  lastMove = null;
+  manualResult = null;
+  pending = null;
+  phase = 'setup';
+  chess = freshChess();
+  startFen = chess.fen();
+  placeBoard(false);
+  render();
+  const start = document.getElementById('start-game');
+  if (start) start.focus();
+}
+
+function startGame() {
+  if (unsavedFinished()) {
+    notice = 'This finished game is still unsaved. Discard it, or keep it open, before starting another. Account saving is not available.';
+    render();
+    return;
+  }
+  if (phase === 'playing') return;
   engine.cancel();
   delete engineEl.dataset.thinking;
   hidePromotion();
   selected = null;
   lastMove = null;
   manualResult = null;
+  pending = null;
   notice = '';
-  chess = new Chess();
-  if (reviewFen) {
-    try {
-      chess.load(reviewFen);
-    } catch (err) {
-      chess = new Chess();
-      notice = 'That position could not be loaded. A new game was started.';
-    }
-  }
+  chess = freshChess();
+  startFen = chess.fen();
+  phase = 'playing';
+  placeBoard(true);
+  if (engineReady) engine.setElo(prefs.elo);
+  windowEl.hidden = false;
+  windowEl.focus();
   render();
-  if (engineReady) requestBot();
+  requestBot();
+}
+
+function askLeave(action) {
+  if (unsavedFinished()) {
+    notice = 'This finished game is still unsaved. Save is not available yet. Discard it or download the PGN before leaving. Leaving is blocked so the moves are not dropped.';
+    render();
+    return;
+  }
+  if (phase !== 'playing') return;
+  leaveAction = action;
+  leavePrompt.hidden = false;
+  document.getElementById('leave-cancel').focus();
 }
 
 engine.on((type, detail) => {
@@ -191,9 +353,10 @@ engine.on((type, detail) => {
   }
   if (type === 'ready') {
     engineReady = true;
-    engineEl.textContent = 'Engine ready. Stockfish 19 lite, searching for up to ' + (movetime / 1000) + ' seconds. This is not a rated game.';
+    engine.setElo(prefs.elo);
+    engineEl.textContent = 'Engine ready. ' + strengthNote(prefs.elo);
     render();
-    requestBot();
+    if (phase === 'playing') requestBot();
     return;
   }
   if (type === 'error') {
@@ -207,13 +370,13 @@ engine.on((type, detail) => {
   if (type === 'thinking') return;
   if (type !== 'move') return;
   delete engineEl.dataset.thinking;
-  if (detail.fen !== chess.fen() || manualResult || outcome(chess).over) {
+  if (phase !== 'playing' || detail.fen !== chess.fen() || manualResult || outcome(chess).over) {
     render();
     return;
   }
   const played = applyUci(chess, detail.uci);
   if (!played) {
-    notice = 'The engine returned a move that is not legal here. No bot move was played. Use New game to continue.';
+    notice = 'The engine returned a move that is not legal here. No bot move was played.';
     render();
     return;
   }
@@ -224,35 +387,89 @@ engine.on((type, detail) => {
 });
 
 document.getElementById('play-white').addEventListener('click', () => {
-  if (player === 'w' && !reviewFen) return;
+  if (phase !== 'setup') return;
   player = 'w';
-  newGame();
+  render();
 });
 document.getElementById('play-black').addEventListener('click', () => {
-  if (player === 'b' && !reviewFen) return;
+  if (phase !== 'setup') return;
   player = 'b';
-  newGame();
+  render();
 });
-document.querySelectorAll('[data-ms]').forEach((button) => {
-  button.addEventListener('click', () => {
-    movetime = Number(button.getAttribute('data-ms'));
-    document.querySelectorAll('[data-ms]').forEach((item) => {
-      item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+
+function choiceButtons(container, items, selectedId, onPick) {
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool';
+    button.textContent = item.label;
+    button.setAttribute('aria-pressed', item.id === selectedId ? 'true' : 'false');
+    button.addEventListener('click', () => {
+      if (phase !== 'setup') return;
+      onPick(item.id);
+      [...container.querySelectorAll('button')].forEach((other) => {
+        other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
+      });
     });
-    if (engineReady && !engineEl.dataset.failed) {
-      engineEl.textContent = 'Engine ready. Stockfish 19 lite, searching for up to ' + (movetime / 1000) + ' seconds. This is not a rated game.';
-    }
+    container.append(button);
   });
+}
+
+choiceButtons(document.getElementById('elo-choices'), ELO_CHOICES.map((elo) => ({ id: String(elo), label: String(elo) })), String(prefs.elo), (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { elo: Number(id) }));
+  engine.setElo(prefs.elo);
+  if (engineReady && !engineEl.dataset.failed) engineEl.textContent = 'Engine ready. ' + strengthNote(prefs.elo);
+  render();
 });
-document.getElementById('new-game').addEventListener('click', () => newGame());
+choiceButtons(document.getElementById('palette-choices'), PALETTES, prefs.palette, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { palette: id }));
+  render();
+});
+choiceButtons(document.getElementById('piece-style-choices'), PIECE_STYLES, prefs.pieceStyle, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { pieceStyle: id }));
+  render();
+});
+choiceButtons(document.getElementById('piece-color-choices'), PIECE_COLORS, prefs.pieceColor, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { pieceColor: id }));
+  render();
+});
+
+document.getElementById('start-game').addEventListener('click', startGame);
+document.getElementById('new-game').addEventListener('click', () => askLeave('new'));
+document.getElementById('exit-game').addEventListener('click', () => askLeave('exit'));
+document.getElementById('leave-cancel').addEventListener('click', () => {
+  leavePrompt.hidden = true;
+  leaveAction = '';
+});
+document.getElementById('leave-confirm').addEventListener('click', () => {
+  returnToSetup();
+});
 document.getElementById('resign').addEventListener('click', () => {
-  if (outcome(chess).over || manualResult) return;
+  if (phase !== 'playing' || outcome(chess).over || manualResult) return;
   engine.cancel();
   delete engineEl.dataset.thinking;
   manualResult = player === 'w' ? '0-1' : '1-0';
   selected = null;
   hidePromotion();
   render();
+});
+document.getElementById('save-account').addEventListener('click', () => {
+  if (!pending || !pending.record) return;
+  const account = currentAccount();
+  const before = pending.record.pgn;
+  const decision = applySave('manual', account, loadAutoSavePreference(account), pending.record, book);
+  pending.status = decision.status;
+  pending.error = decision.error;
+  pending.accountId = decision.accountId;
+  pending.record = decision.record;
+  if (pending.record.pgn !== before) pending.error = 'The game record changed during the save attempt, so it was not treated as saved.';
+  notice = '';
+  render();
+});
+document.getElementById('discard-result').addEventListener('click', () => {
+  if (pending && pending.record) book.noteDiscard(pending.record.id);
+  notice = 'The unsaved game was discarded. Games already stored in an account are not deleted. None are stored yet.';
+  returnToSetup();
 });
 document.getElementById('download-pgn').addEventListener('click', () => {
   const blob = new Blob([pgnEl.value], { type: 'application/x-chess-pgn' });
@@ -269,20 +486,34 @@ promotionEl.addEventListener('click', (event) => {
   const choice = pendingPromotion;
   tryMove(choice.from, choice.to, button.getAttribute('data-piece'));
 });
+autoBox.addEventListener('change', syncAccountSettings);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && pendingPromotion) {
     hidePromotion();
     render();
+    return;
+  }
+  if (event.key === 'Escape' && phase !== 'setup') {
+    askLeave('exit');
+    return;
+  }
+  if (event.key !== 'Tab' || windowEl.hidden) return;
+  const nodes = [...windowEl.querySelectorAll('button, textarea, a, input')].filter((el) => !el.disabled && !el.closest('[hidden]'));
+  if (!nodes.length) return;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
   }
 });
 
-if (reviewFen) {
-  try {
-    chess.load(reviewFen);
-  } catch (err) {
-    chess = new Chess();
-    notice = 'That position could not be loaded. A new game was started.';
-  }
-}
+chess = freshChess();
+startFen = chess.fen();
+placeBoard(false);
+syncAccountSettings();
 render();
 engine.start();

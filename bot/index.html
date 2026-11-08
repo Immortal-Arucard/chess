@@ -41,39 +41,79 @@
   <p class="eyebrow">Playable</p>
   <h1>Bot chess</h1>
   <p class="lead">Play a standard game against a bot on this site.</p>
-  <div class="prose"><p>Legal moves are enforced, including check, castling, en passant, and promotion. The bot runs in a separate worker. Search time is a limit, not a rating.</p></div>
+  <div class="prose"><p>Legal moves are enforced, including check, castling, en passant, and promotion. The bot is Stockfish 19 Lite in a worker. Its strength control is UCI_Elo from 1320 to 3190. Those values are the engine's limits, not a measured rating. This build does not accept a target below 1320. Press Start game before any move. When the game ends you can download the PGN or discard the result. Saving the full game to a Chess account is not available yet.</p></div>
+  <section class="account-settings" aria-labelledby="account-settings-title">
+    <h2 id="account-settings-title">Account settings</h2>
+    <p id="autosave-note">Automatically save bot-game results is an account setting. It is off by default and is stored with the Chess account, not on this device. Chess accounts are not available yet, so it cannot be turned on.</p>
+    <label class="account-option" for="autosave-bot">
+      <input type="checkbox" id="autosave-bot" disabled aria-describedby="autosave-note">
+      Automatically save bot-game results
+    </label>
+  </section>
   <div class="play">
-    <div class="play-toolbar">
-      <fieldset>
-        <legend>Play as</legend>
-        <button type="button" class="tool" id="play-white" aria-pressed="true">White</button>
-        <button type="button" class="tool" id="play-black" aria-pressed="false">Black</button>
-      </fieldset>
-      <fieldset>
-        <legend>Bot search</legend>
-        <button type="button" class="tool" data-ms="200" aria-pressed="false">Up to 0.2s</button>
-        <button type="button" class="tool" data-ms="500" aria-pressed="true">Up to 0.5s</button>
-        <button type="button" class="tool" data-ms="1200" aria-pressed="false">Up to 1.2s</button>
-      </fieldset>
-      <button type="button" class="tool" id="new-game">New game</button>
-      <button type="button" class="tool" id="resign">Resign</button>
+    <div class="play-setup" id="setup">
+      <div class="play-toolbar">
+        <fieldset>
+          <legend>Play as</legend>
+          <button type="button" class="tool" id="play-white" aria-pressed="true">White</button>
+          <button type="button" class="tool" id="play-black" aria-pressed="false">Black</button>
+        </fieldset>
+        <fieldset id="elo-choices">
+          <legend>Bot limit</legend>
+        </fieldset>
+        <fieldset id="palette-choices">
+          <legend>Board</legend>
+        </fieldset>
+        <fieldset id="piece-style-choices">
+          <legend>Piece style</legend>
+        </fieldset>
+        <fieldset id="piece-color-choices">
+          <legend>Piece color</legend>
+        </fieldset>
+        <button type="button" class="tool" id="start-game">Start game</button>
+      </div>
+      <p id="setup-status">Choose a color, bot limit, and appearance, then start the game. Pieces stay where they are until you start.</p>
+      <div id="board-preview"><div id="board"></div></div>
     </div>
-    <p id="status" role="status">Waiting for the engine.</p>
-    <p id="engine-status" role="status">Loading the engine…</p>
-    <div id="board"></div>
-    <div id="promotion" class="promotion" role="dialog" aria-modal="true" aria-labelledby="promotion-title" hidden>
-      <p id="promotion-title">Promote the pawn to</p>
-      <button type="button" class="tool" data-piece="q">Queen</button>
-      <button type="button" class="tool" data-piece="r">Rook</button>
-      <button type="button" class="tool" data-piece="b">Bishop</button>
-      <button type="button" class="tool" data-piece="n">Knight</button>
+    <div id="game-window" class="game-window" hidden role="dialog" aria-modal="true" aria-labelledby="game-window-title" tabindex="-1">
+      <div class="game-window-bar">
+        <h2 id="game-window-title">Game</h2>
+        <button type="button" class="tool" id="exit-game">Exit</button>
+      </div>
+      <p id="game-summary"></p>
+      <p id="status" role="status">Waiting for the engine.</p>
+      <p id="engine-status" role="status">Loading the engine…</p>
+      <div id="end-panel" hidden>
+        <h2>Game over</h2>
+        <p id="save-status" data-state=""></p>
+        <button type="button" class="tool" id="save-account">Save to account</button>
+        <button type="button" class="tool" id="discard-result">Discard</button>
+        <p id="save-detail"></p>
+      </div>
+      <div id="board-mount"></div>
+      <div id="promotion" class="promotion" role="dialog" aria-modal="true" aria-labelledby="promotion-title" hidden>
+        <p id="promotion-title">Promote the pawn to</p>
+        <button type="button" class="tool" data-piece="q">Queen</button>
+        <button type="button" class="tool" data-piece="r">Rook</button>
+        <button type="button" class="tool" data-piece="b">Bishop</button>
+        <button type="button" class="tool" data-piece="n">Knight</button>
+      </div>
+      <div class="game-actions">
+        <button type="button" class="tool" id="resign">Resign</button>
+        <button type="button" class="tool" id="new-game">New game</button>
+      </div>
+      <div id="leave-prompt" class="leave-prompt" hidden>
+        <p>Leave this unfinished game? There is no finished result to save.</p>
+        <button type="button" class="tool" id="leave-confirm">Leave game</button>
+        <button type="button" class="tool" id="leave-cancel">Keep playing</button>
+      </div>
+      <h2>Moves</h2>
+      <ol id="moves" class="moves"></ol>
+      <h2>PGN</h2>
+      <textarea id="pgn" class="pgn" readonly aria-label="PGN of this game"></textarea>
+      <button type="button" class="tool" id="download-pgn">Download PGN</button>
     </div>
-    <h2>Moves</h2>
-    <ol id="moves" class="moves"></ol>
-    <h2>PGN</h2>
-    <textarea id="pgn" class="pgn" readonly aria-label="PGN of this game"></textarea>
-    <button type="button" class="tool" id="download-pgn">Download PGN</button>
-    <p class="credits">Rules: chess.js 1.4.0, BSD-2-Clause, <a href="/assets/vendor/chess.js/LICENSE">license</a>. Engine: unmodified Stockfish 19 lite, single-threaded, GPL-3.0, <a href="/assets/vendor/stockfish/Copying.txt">GPL-3.0</a>, <a href="/assets/vendor/stockfish/SOURCE.txt">source</a>.</p>
+    <p class="credits">Rules: chess.js 1.4.0, BSD-2-Clause, <a href="/assets/vendor/chess.js/LICENSE">license</a>. Engine: unmodified Stockfish 19 lite, single-threaded, GPL-3.0, <a href="/assets/vendor/stockfish/Copying.txt">GPL-3.0</a>, <a href="/assets/vendor/stockfish/SOURCE.txt">source</a>. Standard pieces by Cburnett, <a href="/assets/chess/piece-sets-LICENSE.txt">CC BY-SA 3.0</a>. Bold and Contour pieces are original to this site.</p>
   </div>
   <nav class="page-nav" aria-label="Sections">
   <h2>Sections</h2>

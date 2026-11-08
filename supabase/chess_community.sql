@@ -10,7 +10,8 @@
 
 begin;
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto schema extensions;
 
 do $$ begin
   create role chess_api nologin;
@@ -135,7 +136,7 @@ language sql
 immutable
 set search_path = ''
 as $$
-  select encode(public.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex')
+  select encode(extensions.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex')
 $$;
 
 create function chess_private.current_profile_id()
@@ -191,7 +192,7 @@ begin
   do update set hits = buckets.hits + 1
   returning hits into total;
   if total > max_hits then
-    raise exception 'Too many %s. Try again in a few minutes.', rate_action;
+    raise exception using message = format('Too many %s. Try again in a few minutes.', rate_action);
   end if;
 end;
 $$;

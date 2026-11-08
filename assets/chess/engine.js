@@ -1,3 +1,5 @@
+import { strengthCommands } from './bot-prefs.js';
+
 export function createEngine(workerUrl) {
   const listeners = new Set();
   let worker = null;
@@ -8,6 +10,7 @@ export function createEngine(workerUrl) {
   let current = null;
   let queued = null;
   let bootTimer = 0;
+  let elo = 1600;
 
   function emit(type, detail) {
     listeners.forEach((fn) => fn(type, detail));
@@ -29,6 +32,7 @@ export function createEngine(workerUrl) {
     current = job;
     queued = null;
     state = 'thinking';
+    strengthCommands(job.elo == null ? elo : job.elo).forEach((command) => worker.postMessage(command));
     worker.postMessage('position fen ' + job.fen);
     worker.postMessage('go movetime ' + job.ms);
     emit('thinking', { token: job.token });
@@ -84,12 +88,18 @@ export function createEngine(workerUrl) {
       };
       worker.postMessage('uci');
     },
-    search(fen, ms) {
+    setElo(value) {
+      elo = value;
+      if (worker && ready && state === 'idle') {
+        strengthCommands(elo).forEach((command) => worker.postMessage(command));
+      }
+    },
+    search(fen, ms, searchElo) {
       if (failed || !ready) {
         emit('error', { message: 'The engine is not ready. No bot move was played.' });
         return false;
       }
-      const job = { fen, ms, token };
+      const job = { fen, ms, token, elo: searchElo == null ? elo : searchElo };
       if (state === 'thinking' || state === 'stopping') {
         queued = job;
         if (state === 'thinking') {
