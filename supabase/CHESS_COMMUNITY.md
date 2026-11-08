@@ -29,9 +29,9 @@ There is no checkbox. Joining Chess always records the private owner row. The Ch
 
 1. Open the chosen project as its owner. In Authentication, confirm email magic links are enabled.
 2. Set Site URL to `https://chess.theworldgovernmentincorporated.com` if this project is only for Chess. If the project is shared with Compass, leave Compass's Site URL in place.
-3. Add these redirect URLs:
-   - `https://chess.theworldgovernmentincorporated.com/community/`
-   - `http://127.0.0.1:8773/community/` for a local check
+3. Leave the Compass Site URL unchanged. Add only this Chess redirect URL:
+   - `https://chess.theworldgovernmentincorporated.com/api/auth/callback`
+   Do not send the master magic link to `/community/`. The callback is handled by the Chess service, which does not put the master token in the browser.
 4. In API settings, confirm Exposed schemas do not include `chess_private`.
 5. Run `supabase/chess_community.sql` once in the SQL editor. It creates public `chess_profiles`, `chess_posts`, `chess_replies`, and `chess_reports`, plus private `chess_private.profile_owners` and `chess_private.admins`. It enables and forces row-level security on the public tables. Confirm there is no trigger on `auth.users` and no statement that copies Compass rows by email.
 6. Open Security Advisor for the public tables. Also confirm the Data API cannot select `chess_private.profile_owners` with the publishable key.

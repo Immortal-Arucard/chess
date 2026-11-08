@@ -117,7 +117,7 @@ export function mountCommunity(root, options) {
       field('Email', email),
       field('Display name', name),
       button,
-      el('p', 'community-note', 'The link only verifies this email. It does not join Chess or any other TWGI service. Joining Chess is a separate step after you return.')
+      el('p', 'community-note', 'This continues at the TWGI account service. Chess does not keep that login. Joining Chess is a separate step after you return, and it does not open any other service.')
     );
     form.addEventListener('submit', (event) => {
       event.preventDefault();

@@ -2,6 +2,41 @@ import { Chess, DEFAULT_POSITION } from '../vendor/chess.js/chess.js';
 
 export const STANDARD_FEN = DEFAULT_POSITION;
 
+export const DEVICE_RECOVERY_KEY = 'chess.bot.deviceRecovery';
+
+export function deviceRecoveryRecord(snapshot) {
+  return {
+    kind: 'device-recovery',
+    accountSave: false,
+    note: 'On this device only. Not an account save.',
+    phase: snapshot.phase,
+    startFen: snapshot.startFen,
+    sans: snapshot.sans || [],
+    player: snapshot.player,
+    manualResult: snapshot.manualResult || null,
+    clientGameId: snapshot.clientGameId,
+    record: snapshot.record || null,
+    discardedIds: snapshot.discardedIds || []
+  };
+}
+
+export function rememberDeviceRecovery(storage, snapshot) {
+  const recovery = deviceRecoveryRecord(snapshot);
+  storage.setItem(DEVICE_RECOVERY_KEY, JSON.stringify(recovery));
+  return recovery;
+}
+
+export function readDeviceRecovery(storage) {
+  try {
+    const value = JSON.parse(storage.getItem(DEVICE_RECOVERY_KEY) || 'null');
+    if (!value || value.kind !== 'device-recovery' || value.accountSave !== false) return null;
+    if (value.clientGameId && (value.discardedIds || []).includes(value.clientGameId)) return null;
+    return value;
+  } catch (err) {
+    return null;
+  }
+}
+
 export const ACCOUNT_SAVE_UNAVAILABLE =
   'Saving to a Chess account is not available yet. This game is still unsaved. The full move record stays on this page until you discard it or leave after discarding. Download the PGN if you want a copy. A PGN download is not an account save.';
 

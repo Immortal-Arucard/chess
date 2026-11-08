@@ -1,19 +1,27 @@
 import { profileRoute } from './community-model.js';
+import { createChessGateway } from './community-gateway.js';
 import { mountCommunity, mountProfile } from './community-view.js';
 
 const root = document.getElementById('community-app');
 const route = profileRoute(window.location);
 
-// Chess accounts are not available. Do not load a master sign-in library or
-// keep a master session in this browser.
-if (route.page === 'profile') {
-  mountProfile(root, {
-    configured: false,
-    gateway: null,
-    valid: route.valid,
-    reason: route.reason,
-    profileId: route.id
-  });
-} else {
-  mountCommunity(root, { configured: false, gateway: null });
+function show(configured, gateway) {
+  if (route.page === 'profile') {
+    mountProfile(root, {
+      configured,
+      gateway,
+      valid: route.valid,
+      reason: route.reason,
+      profileId: route.id
+    });
+    return;
+  }
+  mountCommunity(root, { configured, gateway });
 }
+
+fetch('/api/session', { credentials: 'same-origin' }).then((response) => {
+  if (!response.ok) throw new Error('unavailable');
+  show(true, createChessGateway());
+}).catch(() => {
+  show(false, null);
+});

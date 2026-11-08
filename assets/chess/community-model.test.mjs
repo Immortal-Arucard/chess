@@ -58,6 +58,8 @@ assert.equal(Object.hasOwn(shownOwner, 'owner_id'), false);
 assert.equal(Object.hasOwn(shownOwner, 'email'), false);
 
 const sql = readFileSync(new URL('../../supabase/chess_community.sql', import.meta.url), 'utf8');
+assert.match(sql, /extensions\.digest/);
+assert.doesNotMatch(sql, /public\.digest/);
 for (const table of ['chess_profiles', 'chess_posts', 'chess_replies', 'chess_reports']) {
   assert.match(sql, new RegExp('alter table public\\.' + table + ' enable row level security'));
   assert.match(sql, new RegExp('alter table public\\.' + table + ' force row level security'));
@@ -86,7 +88,7 @@ assert.doesNotMatch(sql, /grant execute on function chess_private\.provision_pro
 const appText = readFileSync(new URL('./community-app.js', import.meta.url), 'utf8');
 assert.equal(appText.includes('createClient'), false);
 assert.equal(appText.includes('supabase.js'), false);
-assert.equal(appText.includes('master sign-in library'), true);
+assert.equal(appText.includes('/api/session'), true);
 assert.doesNotMatch(sql, /eyJ[A-Za-z0-9_-]{20,}/);
 
 const users = {

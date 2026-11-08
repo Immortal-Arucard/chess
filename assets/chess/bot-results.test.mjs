@@ -9,7 +9,9 @@ import {
   buildGameRecord,
   createResultBook,
   loadAutoSavePreference,
+  readDeviceRecovery,
   recordReplayErrors,
+  rememberDeviceRecovery,
   replayRecord
 } from './bot-results.js';
 
@@ -138,5 +140,18 @@ assert.equal(offline.record.moves[0].uci, 'a7a8q');
 const game = new Chess();
 game.move('e4');
 assert.equal(game.history().length, 1);
+
+const device = rememberDeviceRecovery({ setItem(_key, value) { this.value = value; }, value: null }, {
+  phase: 'ended',
+  startFen: castle.startFen,
+  sans: castle.moves.map((move) => move.san),
+  player: 'w',
+  clientGameId: castle.id,
+  record: castle,
+  discardedIds: []
+});
+assert.equal(device.accountSave, false);
+assert.match(device.note, /Not an account save/);
+assert.equal(device.record.pgn, castle.pgn);
 
 console.log('bot result record tests passed');
