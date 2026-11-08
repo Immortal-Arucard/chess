@@ -79,6 +79,7 @@ function publicError(error) {
     'This account is suspended.',
     'Join Chess before doing that.',
     'A discussion message must be 1 to 1000 characters.',
+    'You can discuss only as your own Chess profile.',
     'Sign in before joining Chess.',
     'Sign in before doing that.',
     'Enter a display name of 1 to 40 characters.',
@@ -313,7 +314,8 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/discussion') {
-        const result = await query('select chess_service.discussion_send($1, $2) as message', [token, body.body]);
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const result = await query('select chess_service.discussion_send($1, $2, $3) as message', [token, body.body, authorId]);
         return send(200, result.rows[0].message);
       }
       if (url.pathname === '/api/posts') {

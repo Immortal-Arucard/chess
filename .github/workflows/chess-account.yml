@@ -36,6 +36,7 @@ jobs:
       - run: npm install --prefix server
       - run: node assets/chess/bot-results.test.mjs
       - run: node assets/chess/community-model.test.mjs
+      - run: node assets/chess/discussion-room.test.mjs
       - run: node server/game-record.test.mjs
       - run: node server/supabase-auth.test.mjs
       - run: node server/worker.test.mjs

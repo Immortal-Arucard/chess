@@ -15,6 +15,7 @@ create index chess_discussion_order on public.chess_discussion_messages (created
 revoke all on table public.chess_discussion_messages from public, anon, authenticated, chess_api, chess_server;
 grant select on table public.chess_discussion_messages to anon, authenticated;
 alter table public.chess_discussion_messages enable row level security;
+alter table public.chess_discussion_messages force row level security;
 
 create policy chess_discussion_select on public.chess_discussion_messages
   for select to anon, authenticated
@@ -28,9 +29,32 @@ set search_path = ''
 as $$
 declare
   result jsonb;
+  lim integer := least(greatest(coalesce(page_limit, 30), 1), 50);
 begin
   if before_time is not null and after_time is not null then
     raise exception 'The request could not be completed.';
+  end if;
+  if (before_time is null) <> (before_id is null) or (after_time is null) <> (after_id is null) then
+    raise exception 'The request could not be completed.';
+  end if;
+  if after_time is not null then
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'id', page.id,
+      'authorId', page.author_id,
+      'authorName', page.display_name,
+      'body', page.body,
+      'createdAt', page.created_at
+    ) order by page.created_at, page.id), '[]'::jsonb)
+    into result
+    from (
+      select messages.id, messages.author_id, profiles.display_name, messages.body, messages.created_at
+      from public.chess_discussion_messages messages
+      join public.chess_profiles profiles on profiles.id = messages.author_id
+      where (messages.created_at, messages.id) > (after_time, after_id)
+      order by messages.created_at asc, messages.id asc
+      limit lim
+    ) page;
+    return result;
   end if;
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', page.id,
@@ -44,16 +68,15 @@ begin
     select messages.id, messages.author_id, profiles.display_name, messages.body, messages.created_at
     from public.chess_discussion_messages messages
     join public.chess_profiles profiles on profiles.id = messages.author_id
-    where (before_time is null or (messages.created_at, messages.id) < (before_time, before_id))
-      and (after_time is null or (messages.created_at, messages.id) > (after_time, after_id))
+    where before_time is null or (messages.created_at, messages.id) < (before_time, before_id)
     order by messages.created_at desc, messages.id desc
-    limit least(greatest(coalesce(page_limit, 30), 1), 50)
+    limit lim
   ) page;
   return result;
 end;
 $$;
 
-create function chess_service.discussion_send(raw_token text, message_body text)
+create function chess_service.discussion_send(raw_token text, message_body text, expected_author uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -67,6 +90,9 @@ declare
   name text;
 begin
   actor := chess_private.as_profile(raw_token);
+  if expected_author is distinct from actor then
+    raise exception 'You can discuss only as your own Chess profile.';
+  end if;
   if char_length(clean) < 1 or char_length(clean) > 1000 or clean ~ '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]' then
     raise exception 'A discussion message must be 1 to 1000 characters.';
   end if;
@@ -87,8 +113,8 @@ end;
 $$;
 
 revoke all on function chess_service.discussion_page(timestamptz, uuid, timestamptz, uuid, integer) from public, anon, authenticated, chess_api;
-revoke all on function chess_service.discussion_send(text, text) from public, anon, authenticated, chess_api;
+revoke all on function chess_service.discussion_send(text, text, uuid) from public, anon, authenticated, chess_api;
 grant execute on function chess_service.discussion_page(timestamptz, uuid, timestamptz, uuid, integer) to chess_server;
-grant execute on function chess_service.discussion_send(text, text) to chess_server;
+grant execute on function chess_service.discussion_send(text, text, uuid) to chess_server;
 
 commit;

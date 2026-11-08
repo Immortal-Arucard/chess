@@ -392,7 +392,13 @@ export function mountDiscussion(root, options) {
   let notice = '';
   let oldest = null;
   let timer = 0;
+  let shell = null;
+  let inputNode = null;
+  let draftText = '';
+  let draftAuthorId = null;
+  let draining = false;
   const seen = new Set();
+  const pageSize = 20;
 
   function remember(items) {
     items.forEach((item) => {
@@ -404,106 +410,186 @@ export function mountDiscussion(root, options) {
     oldest = messages[0] || null;
   }
 
-  function render() {
-    root.replaceChildren();
-    root.className = 'community';
-    const back = document.createElement('a');
-    back.href = '/community/';
-    back.textContent = 'Community';
-    root.append(back, el('h2', null, 'Discussion'), el('p', 'community-note', 'One conversation for everyone who has joined Chess. Messages are kept by the Chess account service, not on this device. New messages are checked every few seconds.'));
-    if (!options.configured) {
-      root.append(el('p', null, 'The discussion could not be reached. Nothing from it is stored on this device.'));
+  function paintStatus() {
+    if (!shell) return;
+    shell.error.hidden = !error;
+    shell.error.textContent = error;
+    shell.notice.hidden = !notice;
+    shell.notice.textContent = notice;
+  }
+
+  function paintMessages() {
+    if (!shell) return;
+    shell.earlier.hidden = !oldest;
+    shell.log.replaceChildren();
+    if (!messages.length) {
+      shell.log.append(el('p', null, 'No messages yet.'));
       return;
     }
-    if (error) root.append(el('p', 'community-error', error));
-    if (notice) root.append(el('p', 'community-status', notice));
-    if (oldest) {
-      const earlier = el('button', 'tool', 'Earlier messages');
-      earlier.type = 'button';
-      earlier.addEventListener('click', () => loadOlder());
-      root.append(earlier);
-    }
-    const log = el('div', 'discussion-log');
-    log.id = 'discussion-log';
-    if (!messages.length) log.append(el('p', null, 'No messages yet.'));
     messages.forEach((item) => {
       const line = el('p', 'discussion-line');
       const who = document.createElement('a');
       who.href = profilePath(item.authorId);
       who.textContent = item.authorName || 'Member';
       line.append(who, document.createTextNode(' ' + item.body));
-      log.append(line);
+      shell.log.append(line);
     });
-    root.append(log);
+  }
+
+  function discardDraft(message) {
+    draftText = '';
+    draftAuthorId = null;
+    if (inputNode) inputNode.value = '';
+    if (message) notice = message;
+  }
+
+  function paintComposer() {
+    if (!shell) return;
     if (!profile) {
-      root.append(el('p', 'community-note', 'Sign in and click Join Chess before writing in the discussion.'));
+      if (inputNode) {
+        draftText = inputNode.value;
+        inputNode = null;
+      }
+      shell.composer.replaceChildren(el('p', 'community-note', 'Sign in and click Join Chess before writing in the discussion.'));
       return;
     }
+    if (draftAuthorId && profile.id !== draftAuthorId) {
+      discardDraft('That draft was discarded because the Chess profile changed.');
+      paintStatus();
+    }
+    if (inputNode && inputNode.parentNode) return;
     const input = document.createElement('textarea');
     input.id = 'discussion-body';
     input.maxLength = 1000;
     input.rows = 3;
+    input.value = draftText;
+    input.addEventListener('input', () => {
+      draftText = input.value;
+      draftAuthorId = input.value ? profile.id : null;
+    });
     const send = el('button', 'tool', 'Send');
     send.id = 'discussion-send';
     send.type = 'button';
-    send.addEventListener('click', () => submit(input));
-    root.append(field('Message', input), send);
+    send.addEventListener('click', () => submit());
+    inputNode = input;
+    shell.composer.replaceChildren(field('Message', input), send);
   }
 
-  async function submit(input) {
-    const result = cleanDiscussion(input.value);
-    if (!result.ok) { error = result.error; render(); return; }
+  function render() {
+    if (!options.configured) {
+      root.replaceChildren();
+      root.className = 'community';
+      root.append(el('p', null, 'The discussion could not be reached. Nothing from it is stored on this device.'));
+      return;
+    }
+    if (!shell) {
+      root.replaceChildren();
+      root.className = 'community';
+      const back = document.createElement('a');
+      back.href = '/community/';
+      back.textContent = 'Community';
+      const errorNode = el('p', 'community-error', '');
+      errorNode.setAttribute('role', 'alert');
+      const noticeNode = el('p', 'community-status', '');
+      const earlier = el('button', 'tool', 'Earlier messages');
+      earlier.type = 'button';
+      earlier.addEventListener('click', () => loadOlder());
+      const log = el('div', 'discussion-log');
+      log.id = 'discussion-log';
+      const composer = el('div', null, '');
+      shell = { error: errorNode, notice: noticeNode, earlier, log, composer };
+      root.append(
+        back,
+        el('h2', null, 'Discussion'),
+        el('p', 'community-note', 'One conversation for everyone who has joined Chess. Messages are kept by the Chess account service, not on this device. New messages are checked every few seconds.'),
+        errorNode,
+        noticeNode,
+        earlier,
+        log,
+        composer
+      );
+    }
+    paintStatus();
+    paintMessages();
+    paintComposer();
+  }
+
+  async function submit() {
+    if (!inputNode) return;
+    const result = cleanDiscussion(inputNode.value);
+    if (!result.ok) { error = result.error; paintStatus(); return; }
+    const authorAtSend = draftAuthorId || (profile && profile.id);
     error = '';
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       error = 'The discussion is not stored on this device.';
-      render();
+      paintStatus();
       return;
     }
     try {
       const session = await gateway.profile();
+      if (!session || !authorAtSend || session.id !== authorAtSend) {
+        profile = session;
+        discardDraft();
+        error = 'This draft belongs to a different Chess profile. It was not sent.';
+        paintComposer();
+        paintStatus();
+        return;
+      }
       profile = session;
-      if (!profile) throw new Error('Sign in and click Join Chess before writing in the discussion.');
-      const message = await gateway.sendDiscussion(result.value);
+      const message = await gateway.sendDiscussion(result.value, authorAtSend);
       remember([message]);
+      discardDraft();
       notice = '';
+      paintMessages();
     } catch (err) {
       error = err && err.message ? err.message : 'The discussion is not stored on this device.';
     }
-    render();
+    paintStatus();
   }
 
   async function loadOlder() {
     if (!oldest) return;
     try {
-      const page = await gateway.listDiscussion({ before: { createdAt: oldest.createdAt, id: oldest.id }, limit: 20 });
+      const page = await gateway.listDiscussion({ before: { createdAt: oldest.createdAt, id: oldest.id }, limit: pageSize });
       if (!page.messages.length) notice = 'No earlier messages.';
       remember(page.messages);
     } catch (err) {
       error = err && err.message ? err.message : 'The discussion could not be loaded.';
     }
-    render();
+    paintMessages();
+    paintStatus();
   }
 
   async function loadNew() {
-    if (document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
-    const newest = messages[messages.length - 1];
+    if (draining || document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    draining = true;
     try {
-      const page = await gateway.listDiscussion(newest
-        ? { after: { createdAt: newest.createdAt, id: newest.id }, limit: 20 }
-        : { limit: 20 });
-      if (page.messages.length) {
+      let pages = 0;
+      while (pages < 5) {
+        const newest = messages[messages.length - 1];
+        const page = await gateway.listDiscussion(newest
+          ? { after: { createdAt: newest.createdAt, id: newest.id }, limit: pageSize }
+          : { limit: pageSize });
+        pages += 1;
+        if (!page.messages.length) break;
+        const beforeCount = messages.length;
         remember(page.messages);
-        render();
+        if (messages.length !== beforeCount) {
+          paintMessages();
+          paintStatus();
+        }
+        if (page.messages.length < pageSize) break;
       }
     } catch (err) { /* the next check tries again */ }
+    finally { draining = false; }
   }
 
   render();
   if (!options.configured || !gateway) return;
-  gateway.profile().then((person) => { profile = person; render(); }).catch(() => { profile = null; });
-  gateway.listDiscussion({ limit: 20 }).then((page) => { remember(page.messages); render(); }).catch((err) => {
+  gateway.profile().then((person) => { profile = person; paintComposer(); }).catch(() => { profile = null; paintComposer(); });
+  gateway.listDiscussion({ limit: pageSize }).then((page) => { remember(page.messages); paintMessages(); }).catch((err) => {
     error = err && err.message ? err.message : 'The discussion could not be loaded.';
-    render();
+    paintStatus();
   });
   timer = window.setInterval(loadNew, 4000);
   window.addEventListener('pagehide', () => window.clearInterval(timer));

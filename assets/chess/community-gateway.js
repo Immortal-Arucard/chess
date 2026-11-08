@@ -132,8 +132,8 @@ export function createChessGateway() {
       if (!response.ok) throw new Error(body.error || 'The discussion could not be loaded.');
       return { messages: body.messages || [] };
     },
-    async sendDiscussion(body) {
-      return send('/api/discussion', { body });
+    async sendDiscussion(body, authorId) {
+      return send('/api/discussion', { body, authorId });
     },
     async listReplies(postId, options) {
       const cursor = options && options.cursor;
