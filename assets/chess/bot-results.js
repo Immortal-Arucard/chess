@@ -172,8 +172,8 @@ export function createResultBook() {
   };
 }
 
-export function applySave(kind, account, preference, record, book, options = {}) {
-  const service = options.service || accountSaveService();
+export function applySave(kind, account, preference, record, book) {
+  const service = accountSaveService();
   const kept = record;
   if (!kept || recordReplayErrors(kept).length) {
     return { status: 'unsaved', outcome: 'invalid', record: kept, error: 'This game record is incomplete, so it was not saved.', accountId: null };
@@ -196,46 +196,22 @@ export function applySave(kind, account, preference, record, book, options = {})
       accountId: null
     };
   }
-  if (!service || service.live !== true || !account || account.available !== true || !account.id) {
-    return { status: 'unsaved', outcome: 'unavailable', record: kept, error: (service && service.reason) || ACCOUNT_SAVE_UNAVAILABLE, accountId: null };
-  }
-  if (!kept.boundAccountId || kept.boundAccountId !== account.id) {
-    return {
-      status: 'unsaved',
-      outcome: 'wrong-account',
-      record: kept,
-      error: 'This game was not bound to the signed-in account, so it was not saved.',
-      accountId: null
-    };
-  }
-  if (account.role !== 'owner') {
-    return { status: 'unsaved', outcome: 'forbidden', record: kept, error: 'Only the account owner can save this game.', accountId: null };
-  }
-  if (kind === 'auto' && (!preference || preference.enabled !== true || preference.accountId !== account.id)) {
-    return { status: 'unsaved', outcome: 'manual', record: kept, error: preference && preference.error ? preference.error : '', accountId: null };
-  }
-  if (preference && preference.accountId && preference.accountId !== account.id) {
-    return {
-      status: 'unsaved',
-      outcome: 'wrong-account',
-      record: kept,
-      error: 'Account settings belong to a different account. This game was not saved.',
-      accountId: null
-    };
-  }
-  const key = account.id + ':' + kept.id;
-  if (book.savedCount && book.posts && book.posts.some((post) => post.key === key)) {
-    return { status: 'saved', outcome: 'already-saved', record: kept, error: '', accountId: account.id };
-  }
-  if (service.fail || account.offline) {
+  if (service.live === true) {
     return {
       status: 'unsaved',
       outcome: 'error',
       record: kept,
-      error: service.fail || 'Offline. This game is still unsaved. You can retry, download the PGN, or discard it.',
+      error: 'The account service reported itself live without a Chess save request. The game was not saved.',
       accountId: null
     };
   }
-  book.posts.push({ key, accountId: account.id, record: kept });
-  return { status: 'saved', outcome: 'saved', record: kept, error: '', accountId: account.id };
+  return {
+    status: 'unsaved',
+    outcome: 'unavailable',
+    record: kept,
+    error: service.reason || ACCOUNT_SAVE_UNAVAILABLE,
+    accountId: null,
+    kind: kind || 'manual',
+    preferenceSeen: preference ? preference.enabled === true : false
+  };
 }

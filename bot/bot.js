@@ -156,10 +156,8 @@ function render() {
   endPanel.hidden = phase !== 'ended';
   if (phase === 'ended' && pending) {
     const count = pending.record ? pending.record.moves.length : history.length;
-    saveStatus.dataset.state = pending.status;
-    saveStatus.textContent = pending.status === 'saved'
-      ? 'Saved to your Chess account.'
-      : 'Not saved to an account. ' + count + (count === 1 ? ' move is' : ' moves are') + ' still in this record.';
+    saveStatus.dataset.state = 'unsaved';
+    saveStatus.textContent = 'Not saved to an account. ' + count + (count === 1 ? ' move is' : ' moves are') + ' still in this record.';
     saveDetail.textContent = pending.error || notice || '';
   } else {
     saveStatus.dataset.state = '';
@@ -358,6 +356,7 @@ engine.on((type, detail) => {
     engine.setElo(prefs.elo);
     engineEl.textContent = 'Engine ready. ' + strengthNote(prefs.elo);
     render();
+    if (phase === 'playing') requestBot();
     return;
   }
   if (type === 'error') {
