@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/chess/board.css">
 
 </head>
 <body class="sheet">
@@ -37,11 +38,42 @@
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Bot chess</span></li></ol></nav>
 <main class="page" id="main">
-  <p class="eyebrow">Planned. Not operational.</p>
+  <p class="eyebrow">Playable</p>
   <h1>Bot chess</h1>
-  <div class="prose">
-    <p>This page is reserved for chess against a bot on this site.</p>
-    <p>No bot and no game are available. The page is planned and is not operational.</p>
+  <p class="lead">Play a standard game against a bot on this site.</p>
+  <div class="prose"><p>Legal moves are enforced, including check, castling, en passant, and promotion. The bot runs in a separate worker. Search time is a limit, not a rating.</p></div>
+  <div class="play">
+    <div class="play-toolbar">
+      <fieldset>
+        <legend>Play as</legend>
+        <button type="button" class="tool" id="play-white" aria-pressed="true">White</button>
+        <button type="button" class="tool" id="play-black" aria-pressed="false">Black</button>
+      </fieldset>
+      <fieldset>
+        <legend>Bot search</legend>
+        <button type="button" class="tool" data-ms="200" aria-pressed="false">Up to 0.2s</button>
+        <button type="button" class="tool" data-ms="500" aria-pressed="true">Up to 0.5s</button>
+        <button type="button" class="tool" data-ms="1200" aria-pressed="false">Up to 1.2s</button>
+      </fieldset>
+      <button type="button" class="tool" id="new-game">New game</button>
+      <button type="button" class="tool" id="resign">Resign</button>
+    </div>
+    <p id="status" role="status">Waiting for the engine.</p>
+    <p id="engine-status" role="status">Loading the engine…</p>
+    <div id="board"></div>
+    <div id="promotion" class="promotion" role="dialog" aria-modal="true" aria-labelledby="promotion-title" hidden>
+      <p id="promotion-title">Promote the pawn to</p>
+      <button type="button" class="tool" data-piece="q">Queen</button>
+      <button type="button" class="tool" data-piece="r">Rook</button>
+      <button type="button" class="tool" data-piece="b">Bishop</button>
+      <button type="button" class="tool" data-piece="n">Knight</button>
+    </div>
+    <h2>Moves</h2>
+    <ol id="moves" class="moves"></ol>
+    <h2>PGN</h2>
+    <textarea id="pgn" class="pgn" readonly aria-label="PGN of this game"></textarea>
+    <button type="button" class="tool" id="download-pgn">Download PGN</button>
+    <p class="credits">Rules: chess.js 1.4.0, BSD-2-Clause, <a href="/assets/vendor/chess.js/LICENSE">license</a>. Engine: unmodified Stockfish 19 lite, single-threaded, GPL-3.0, <a href="/assets/vendor/stockfish/Copying.txt">GPL-3.0</a>, <a href="/assets/vendor/stockfish/SOURCE.txt">source</a>.</p>
   </div>
   <nav class="page-nav" aria-label="Sections">
   <h2>Sections</h2>
@@ -68,5 +100,6 @@
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <script src="/assets/site.js"></script>
+<script type="module" src="/bot/bot.js"></script>
 </body>
 </html>
