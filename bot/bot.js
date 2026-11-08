@@ -1,5 +1,6 @@
 import { Chess } from '/assets/vendor/chess.js/chess.js';
 import { mountBoard } from '/assets/chess/board.js';
+import { ELO_CHOICES, PALETTES, PIECE_COLORS, PIECE_STYLES, SEARCH_MS, loadPrefs, pieceColors, savePrefs, strengthNote } from '/assets/chess/bot-prefs.js';
 import { createEngine } from '/assets/chess/engine.js';
 import { applyUci, kingSquare, legalTargets, outcome, pieceMap, pgnFor, promotionMoves } from '/assets/chess/rules.js';
 
@@ -16,7 +17,7 @@ const boardApi = mountBoard(document.getElementById('board'), onSquare);
 const engine = createEngine(ENGINE_URL);
 let chess = new Chess();
 let player = 'w';
-let movetime = 500;
+let prefs = loadPrefs(localStorage);
 let selected = null;
 let pendingPromotion = null;
 let manualResult = null;
@@ -58,6 +59,10 @@ function render() {
     pieces: pieceMap(chess),
     selected,
     legal: interactive ? legal : [],
+    palette: prefs.palette,
+    pieceStyle: prefs.pieceStyle,
+    pieceColor: prefs.pieceColor,
+    pieceColors: pieceColors(prefs.pieceColor),
     checkSquare: state.check ? kingSquare(chess, chess.turn()) : null,
     lastMove,
     interactive
@@ -156,7 +161,7 @@ function requestBot() {
   if (!engine.ready) return;
   engineEl.dataset.thinking = 'true';
   render();
-  const started = engine.search(chess.fen(), movetime);
+  const started = engine.search(chess.fen(), SEARCH_MS, prefs.elo);
   if (!started) {
     delete engineEl.dataset.thinking;
     render();
@@ -191,7 +196,8 @@ engine.on((type, detail) => {
   }
   if (type === 'ready') {
     engineReady = true;
-    engineEl.textContent = 'Engine ready. Stockfish 19 lite, searching for up to ' + (movetime / 1000) + ' seconds. This is not a rated game.';
+    engine.setElo(prefs.elo);
+    engineEl.textContent = 'Engine ready. ' + strengthNote(prefs.elo);
     render();
     requestBot();
     return;
@@ -233,16 +239,39 @@ document.getElementById('play-black').addEventListener('click', () => {
   player = 'b';
   newGame();
 });
-document.querySelectorAll('[data-ms]').forEach((button) => {
-  button.addEventListener('click', () => {
-    movetime = Number(button.getAttribute('data-ms'));
-    document.querySelectorAll('[data-ms]').forEach((item) => {
-      item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+function choiceButtons(container, items, selected, onPick) {
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool';
+    button.textContent = item.label;
+    button.setAttribute('aria-pressed', item.id === selected ? 'true' : 'false');
+    button.addEventListener('click', () => {
+      onPick(item.id);
+      [...container.querySelectorAll('button')].forEach((other) => {
+        other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
+      });
     });
-    if (engineReady && !engineEl.dataset.failed) {
-      engineEl.textContent = 'Engine ready. Stockfish 19 lite, searching for up to ' + (movetime / 1000) + ' seconds. This is not a rated game.';
-    }
+    container.append(button);
   });
+}
+
+choiceButtons(document.getElementById('elo-choices'), ELO_CHOICES.map((elo) => ({ id: String(elo), label: String(elo) })), String(prefs.elo), (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { elo: Number(id) }));
+  engine.setElo(prefs.elo);
+  if (engineReady && !engineEl.dataset.failed) engineEl.textContent = 'Engine ready. ' + strengthNote(prefs.elo);
+});
+choiceButtons(document.getElementById('palette-choices'), PALETTES, prefs.palette, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { palette: id }));
+  render();
+});
+choiceButtons(document.getElementById('piece-style-choices'), PIECE_STYLES, prefs.pieceStyle, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { pieceStyle: id }));
+  render();
+});
+choiceButtons(document.getElementById('piece-color-choices'), PIECE_COLORS, prefs.pieceColor, (id) => {
+  prefs = savePrefs(localStorage, Object.assign({}, prefs, { pieceColor: id }));
+  render();
 });
 document.getElementById('new-game').addEventListener('click', () => newGame());
 document.getElementById('resign').addEventListener('click', () => {
