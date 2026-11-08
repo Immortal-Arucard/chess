@@ -1,6 +1,6 @@
 # Chess account service deployment
 
-The reviewed migration and Worker are already in place. Do not apply the migration again, and do not upload a different Worker bundle over `chess-api`. The live bot on `main` remains `20d38e8e746e4720e0f6c6a8e7d5d171c77d3661`. Community posts, join, and account save are not launched.
+The reviewed migration and Worker are already in place. Do not apply the migration again, and do not upload a different Worker bundle over `chess-api`. `main` is `5762fc36d06f6b6006d1cd4f1a75fb8fbcaf888a`, which includes the live bot `20d38e8e746e4720e0f6c6a8e7d5d171c77d3661` and the temporary sign-in page. This branch replaces that page with the full community UI. Join, posts, and account save are not launched.
 
 ## Already applied
 
@@ -12,17 +12,21 @@ The reviewed migration and Worker are already in place. Do not apply the migrati
 - The route is only `chess.theworldgovernmentincorporated.com/api/*`. The existing CNAME is proxied and GitHub Pages still serves the rest of the site. `workers.dev` and preview URLs are disabled. Query-string log redaction is enabled.
 - The account subdomain `theworldgovernmentincorporated.workers.dev` is registered. The cron `*/15 * * * *` was created at 2:12:23 PM EST on 8 November 2026. A cron execution has not been observed yet.
 - Anonymous `GET /api/session` and `GET /api/posts` returned 200 with `no-store`. The site root returned 200.
-- No auth email, join, private row, or real game save has been tested.
+- On 8 November 2026, a normal-browser sign-in on the published page reached “Signed in. No Chess profile yet.” at 2:26 PM EST. Sign out and a refresh showed “Not signed in.” at 2:28 PM EST. The live cookie flags were not inspected separately. No join, post, private row, or real game save has been tested.
 
 `wrangler.jsonc` in the repository still contains `REPLACE_WITH_CACHE_DISABLED_HYPERDRIVE_ID`. That placeholder is not the live binding. Do not deploy the repository config over the Worker that is already running.
 
-`GET /api/auth/start` returns 405. Sign-in is a POST. The live `/community/` page does not have that form yet.
+`GET /api/auth/start` returns 405. Sign-in is a POST.
 
-## Acceptance still open
+## Next candidate
 
-1. Review and, when accepted, publish only the sign-in page in the separate pull request. It posts `{ email }` to `/api/auth/start` and reads `/api/session`. It does not join, post, or save.
-2. Open `/community/` in a normal browser, send the link, and open the email. The callback returns to `/community/` and the page should say the session is signed in and that no Chess profile exists yet. Sign out should return to not signed in.
-3. After that session check, the unmerged community branch remains the candidate for an explicit join, then a saved game and board replay. Do not merge it as part of the sign-in check.
+This branch is the candidate for the next real check. Publishing it replaces the temporary sign-in page with the community page: email sign-in, an explicit Join Chess step, posts, and the bot’s account save, discard, recovery, and board replay. The bot’s existing colors, piece sets, and strength choices stay. The Worker and SQL bytes stay the reviewed `1925b2a8` bytes. Do not reapply the migration or deploy another backend for this page.
+
+Local and CI checks of join and save used a stand-in identity service and a throwaway database. They are not production results. The first production join and the first production saved game happen only if this candidate is published and then used.
+
+1. On `/community/`, enter the email and a display name, then click Email me a sign-in link. Open the link. The page asks for Join Chess and does not create the profile until that button is used. Click Join Chess and confirm the signed-in display name. This production join is not yet verified.
+2. Open Bot chess. The existing piece sets, colors, and bot limits remain. Finish a game and click Save to account. Reload and confirm the game is listed. Open Replay and use Previous move on the separate board.
+3. Discard one finished game before saving it, and confirm it is absent after reload. Turn on automatic saving, finish another game, and confirm it is stored once. A game started on one profile must not be saved after switching to another profile.
 
 ## Behavior the service implements
 
