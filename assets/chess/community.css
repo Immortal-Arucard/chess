@@ -24,6 +24,45 @@
   border:1px solid var(--sky);background:#000;color:var(--sky);font:inherit;font-weight:600;cursor:pointer;
 }
 .tool:disabled{opacity:.6;cursor:default}
-.tool:focus-visible,.community-field input:focus-visible,.community-field textarea:focus-visible{
+.tool:focus-visible,.community-field input:focus-visible,.community-field textarea:focus-visible,
+.profile-exit:focus-visible,.profile-back:focus-visible,.community-entries .entry:focus-visible{
   outline:2px solid var(--sky);outline-offset:3px;
 }
+body.profile-page{display:block;min-height:100vh;padding:0;background:#000}
+.profile-frame{min-height:100vh;display:flex;flex-direction:column;width:100%}
+.profile-exitbar{
+  position:sticky;top:0;z-index:5;display:flex;flex-direction:column;gap:8px;
+  width:100%;padding:16px;background:#000;border-bottom:1px solid var(--line);
+}
+.profile-exit,.profile-back{
+  display:flex;align-items:center;justify-content:center;min-height:56px;padding:12px 16px;
+  border-radius:14px;font-weight:700;font-size:18px;text-decoration:none;text-align:center;
+}
+.profile-exit{background:var(--sky);color:#000}
+.profile-back{border:1px solid var(--sky);color:var(--sky);background:#000}
+.profile-main{flex:1;width:100%;max-width:720px;margin:0 auto;padding:8px 16px 48px}
+.profile-banner{
+  position:relative;min-height:180px;margin-top:12px;padding:16px;border:1px solid var(--line);border-radius:16px;
+  background:#111 center/cover no-repeat;display:flex;align-items:flex-end;gap:12px;
+}
+.profile-banner.is-empty{background:#111}
+.profile-portrait{
+  width:96px;height:96px;border-radius:50%;overflow:hidden;border:2px solid var(--sky);background:#000;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+}
+.profile-portrait img{width:100%;height:100%;object-fit:cover;display:block}
+.profile-empty,.profile-bio{color:#fff}
+.profile-bio{white-space:pre-wrap;overflow-wrap:anywhere}
+.profile-page .community-tools{flex-direction:column;align-items:stretch}
+.profile-page .community-tools .tool,.profile-page .community-field{width:100%}
+@media (max-width:640px){
+  .profile-banner{min-height:140px;align-items:flex-start;flex-direction:column}
+  .profile-portrait{width:72px;height:72px}
+}
+.community-entries{display:grid;gap:12px;margin:16px 0;width:100%}
+.community-entries .entry,#your-profile-slot .entry{
+  display:flex;flex-direction:column;gap:4px;min-height:72px;padding:16px;border:1px solid var(--sky);
+  border-radius:16px;background:#000;color:#fff;text-decoration:none;
+}
+.community-entries .entry strong,#your-profile-slot .entry strong{color:var(--sky);font-size:20px}
+.community-entries .entry span,#your-profile-slot .entry span{color:var(--mute);font-size:15px;line-height:1.4}

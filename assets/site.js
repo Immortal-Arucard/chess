@@ -59,6 +59,7 @@
             { href: 'self:/puzzles/', name: 'Chess puzzles' },
             { href: 'self:/analysis/', name: 'Game analysis' },
             { href: 'self:/community/', name: 'Community' },
+            { href: 'self:/community/discussion/', name: 'Discussion' },
             { href: 'self:/marketplace/', name: 'Marketplace' },
             { href: 'self:/exchange/', name: 'Exchange' }
           ]

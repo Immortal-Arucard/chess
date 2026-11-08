@@ -63,6 +63,11 @@ export function profilePath(id) {
   return '/community/profile/?id=' + encodeURIComponent(id);
 }
 
+export function profileExitHref(candidate) {
+  void candidate;
+  return '/community/';
+}
+
 export function communityRoute(location) {
   const path = String(location.pathname || '').replace(/\/index\.html$/, '');
   const normalized = path.endsWith('/') ? path : path + '/';

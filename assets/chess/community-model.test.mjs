@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { chessAccess, cleanBody, cleanDiscussion, cleanName, cleanReason, communityRoute, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
+import { chessAccess, cleanBody, cleanDiscussion, cleanName, cleanReason, communityRoute, feedFilter, nextCursor, olderThan, profileExitHref, profilePath, profileRoute, publicProfile } from './community-model.js';
 import { assertPublishable, communityConfig } from './community-config.js';
 
 const name = cleanName('  Ada  Lovelace ');
@@ -30,6 +30,11 @@ assert.equal(olderThan({ id: 'b', createdAt: '2026-11-08T00:00:02Z' }, cursor), 
 assert.match(feedFilter(cursor), /created_at\.lt\./);
 assert.equal(communityRoute({ pathname: '/community/discussion/', search: '' }).page, 'discussion');
 assert.equal(communityRoute({ pathname: '/community/profile/', search: '?id=11111111-1111-4111-8111-111111111111' }).page, 'profile');
+assert.equal(profileExitHref('/community/'), '/community/');
+assert.equal(profileExitHref('https://evil.example'), '/community/');
+assert.equal(profileExitHref('//evil.example'), '/community/');
+assert.equal(profileExitHref('/\\evil'), '/community/');
+assert.equal(profilePath('11111111-1111-4111-8111-111111111111'), '/community/profile/?id=11111111-1111-4111-8111-111111111111');
 assert.equal(cleanDiscussion('<b>safe</b>').value, '<b>safe</b>');
 assert.equal(cleanDiscussion('x'.repeat(1001)).ok, false);
 

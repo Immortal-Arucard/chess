@@ -42,6 +42,7 @@ function setup() {
   `);
   psqlFile(db, 'supabase/chess_release.sql');
   psqlFile(db, 'supabase/chess_discussion.sql');
+  psqlFile(db, 'supabase/chess_profile_card.sql');
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;
@@ -456,6 +457,74 @@ assert.equal(emptyProfile.json.displayName, 'Ada Lovelace');
 assert.ok(emptyProfile.json.createdAt);
 const missingProfile = await request(port, cookieJar(), 'GET', '/api/profiles/99999999-9999-4999-8999-999999999999');
 assert.equal(missingProfile.status, 404);
+assert.equal(emptyProfile.json.bio, '');
+assert.equal(emptyProfile.json.hasPortrait, false);
+assert.equal(emptyProfile.json.hasBackground, false);
+const scriptBio = await request(port, ada, 'POST', '/api/profile/bio', { bio: '<script>alert(1)</script>', authorId: adaJoin.json.id }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(scriptBio.status, 200, scriptBio.text);
+assert.equal(scriptBio.json.bio, '<script>alert(1)</script>');
+assert.equal(JSON.stringify(scriptBio.json).includes(adaMaster), false);
+const bobEditsAda = await request(port, bob, 'POST', '/api/profile/bio', { bio: 'bob wrote this', authorId: adaJoin.json.id }, { 'x-csrf-token': bob.get('chess_csrf') });
+assert.equal(bobEditsAda.status, 400);
+assert.equal(bobEditsAda.json.error, 'You can edit only your own Chess profile.');
+const adaEditsAsBob = await request(port, ada, 'POST', '/api/profile/bio', { bio: 'wrong owner', authorId: bobJoin.json.id }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(adaEditsAsBob.status, 400);
+const unsignedBio = await request(port, cookieJar(), 'POST', '/api/profile/bio', { bio: 'nope', authorId: adaJoin.json.id });
+assert.equal(unsignedBio.status, 401);
+const jpeg = Buffer.from('ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffda00080001000100003f00fbffd9', 'hex');
+const exif = Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, 0x00, 0x12]), Buffer.from('Exif\0SECRET-EXIF', 'ascii'), jpeg.subarray(2)]);
+const uploaded = await fetch('http://127.0.0.1:' + port + '/api/profile/portrait', {
+  method: 'POST',
+  headers: { origin, cookie: ada.header(), 'content-type': 'image/jpeg', 'x-csrf-token': ada.get('chess_csrf'), 'x-chess-profile': adaJoin.json.id },
+  body: exif
+});
+assert.equal(uploaded.status, 200, await uploaded.text());
+const portrait = await fetch('http://127.0.0.1:' + port + '/api/profiles/' + adaJoin.json.id + '/portrait');
+const portraitBytes = Buffer.from(await portrait.arrayBuffer());
+assert.equal(portrait.status, 200);
+assert.equal(portrait.headers.get('content-type'), 'image/jpeg');
+assert.equal(portrait.headers.get('x-content-type-options'), 'nosniff');
+assert.equal(portraitBytes.includes(Buffer.from('SECRET-EXIF')), false);
+const svg = await fetch('http://127.0.0.1:' + port + '/api/profile/background', {
+  method: 'POST',
+  headers: { origin, cookie: ada.header(), 'content-type': 'image/svg+xml', 'x-csrf-token': ada.get('chess_csrf'), 'x-chess-profile': adaJoin.json.id },
+  body: '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+});
+assert.equal(svg.status, 400);
+const remote = await fetch('http://127.0.0.1:' + port + '/api/profile/background', {
+  method: 'POST',
+  headers: { origin, cookie: ada.header(), 'content-type': 'text/plain', 'x-csrf-token': ada.get('chess_csrf'), 'x-chess-profile': adaJoin.json.id },
+  body: 'https://evil.example/secret.png'
+});
+assert.equal(remote.status, 400);
+const stolen = await fetch('http://127.0.0.1:' + port + '/api/profile/portrait', {
+  method: 'POST',
+  headers: { origin, cookie: bob.header(), 'content-type': 'image/jpeg', 'x-csrf-token': bob.get('chess_csrf'), 'x-chess-profile': adaJoin.json.id },
+  body: jpeg
+});
+assert.equal(stolen.status, 400);
+const card = await request(port, cookieJar(), 'GET', '/api/profiles/' + adaJoin.json.id);
+assert.equal(card.json.bio, '<script>alert(1)</script>');
+assert.equal(card.json.hasPortrait, true);
+assert.equal(card.json.hasBackground, false);
+assert.equal(Object.hasOwn(card.json, 'portrait'), false);
+assert.equal(Object.hasOwn(card.json, 'background'), false);
+let anonBlocked = false;
+try { psql(db, 'set role anon; select portrait from public.chess_profiles;'); }
+catch (err) { anonBlocked = /permission denied/i.test(String(err.message)); }
+assert.equal(anonBlocked, true);
+psql(db, `
+  alter table public.chess_posts disable trigger user;
+  insert into public.chess_posts (id, author_id, body, created_at) values
+    ('cccccccc-cccc-4ccc-8ccc-000000000001', '${adaJoin.json.id}', 'tie-old', '2020-01-01 00:00:00+00'),
+    ('cccccccc-cccc-4ccc-8ccc-000000000003', '${adaJoin.json.id}', 'tie-new', '2020-01-01 00:00:00+00'),
+    ('cccccccc-cccc-4ccc-8ccc-000000000002', '${adaJoin.json.id}', 'tie-mid', '2020-01-01 00:00:00+00');
+  alter table public.chess_posts enable trigger user;
+`);
+const newestPosts = await request(port, cookieJar(), 'GET', '/api/profiles/' + adaJoin.json.id + '/posts?limit=2');
+assert.deepEqual(newestPosts.json.posts.map((item) => item.body), ['tie-new', 'tie-mid']);
+const olderPosts = await request(port, cookieJar(), 'GET', '/api/profiles/' + adaJoin.json.id + '/posts?limit=2&before=' + encodeURIComponent(newestPosts.json.posts[1].createdAt) + '&beforeId=' + newestPosts.json.posts[1].id);
+assert.equal(olderPosts.json.posts[0].body, 'tie-old');
 const badDraw = Object.assign({}, record, { result: '1/2-1/2', termination: 'draw', clientGameId: '55555555-5555-4555-8555-555555555555' });
 const rejected = await request(port, ada, 'POST', '/api/games', badDraw, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.notEqual(rejected.status, 200);

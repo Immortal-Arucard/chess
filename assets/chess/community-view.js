@@ -99,7 +99,7 @@ export function mountCommunity(root, options) {
       root.append(el('p', 'eyebrow', 'Checking sign-in'), el('p', null, 'Looking for a community session. No posts are stored on this device.'));
       return;
     }
-    root.append(el('p', 'eyebrow', profile ? 'Signed in' : 'Sign in required'));
+    root.append(el('p', 'eyebrow', !user ? 'Not signed in' : profile ? 'Signed in' : 'Signed in. No Chess profile yet.'));
     if (notice) root.append(el('p', 'community-status', notice));
     if (error) {
       const alert = el('p', 'community-error', error);
@@ -109,6 +109,32 @@ export function mountCommunity(root, options) {
     if (!user) signedOut();
     else if (!profile) nameForm();
     else feed();
+    syncShellState();
+  }
+
+  function syncShellState() {
+    const slot = document.getElementById('community-state');
+    if (slot) {
+      if (!options.configured) slot.textContent = 'Chess accounts could not be reached. Nothing is stored on this device.';
+      else if (phase === 'loading') slot.textContent = 'Checking whether you are signed in.';
+      else if (!user) slot.textContent = 'Not signed in. Join Chess is available only after you sign in.';
+      else if (!profile) slot.textContent = 'Signed in. No Chess profile yet. Click Join Chess. No other service is joined.';
+      else slot.textContent = 'Signed in as ' + profile.displayName + '.';
+    }
+    const own = document.getElementById('your-profile-slot');
+    if (!own) return;
+    own.replaceChildren();
+    if (!profile) return;
+    const link = document.createElement('a');
+    link.className = 'entry';
+    link.id = 'your-profile';
+    link.href = profilePath(profile.id);
+    const strong = document.createElement('strong');
+    strong.textContent = 'Your profile';
+    const span = document.createElement('span');
+    span.textContent = 'Opens your Chess profile as its own page. Exit profile to return to the rest of the site.';
+    link.append(strong, span);
+    own.append(link);
   }
 
   function signedOut() {
@@ -198,11 +224,7 @@ export function mountCommunity(root, options) {
     const nameLink = document.createElement('a');
     nameLink.href = profilePath(profile.id);
     nameLink.textContent = profile.displayName;
-    heading.append(nameLink, document.createTextNode('. '));
-    const ownProfile = document.createElement('a');
-    ownProfile.href = profilePath(profile.id);
-    ownProfile.textContent = 'Your profile';
-    heading.append(ownProfile);
+    heading.append(nameLink, document.createTextNode('.'));
     const rename = document.createElement('input');
     rename.type = 'text';
     rename.maxLength = LIMITS.name;
@@ -635,14 +657,27 @@ export function mountProfile(root, options) {
   let viewer = null;
   let posts = [];
   let cursor = null;
+  let imageVersion = 1;
+
+  async function saveImage(kind, input) {
+    const editingId = person.id;
+    const session = await gateway.profile();
+    if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
+    const file = input.files && input.files[0];
+    if (!file) throw new Error('Choose a JPEG, PNG, or WebP image.');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 524288) {
+      throw new Error('Use a JPEG, PNG, or WebP image up to 512 KB.');
+    }
+    const bytes = await file.arrayBuffer();
+    await gateway.saveProfileImage(kind, bytes, file.type, editingId);
+    if (kind === 'portrait') person.hasPortrait = true;
+    else person.hasBackground = true;
+    imageVersion += 1;
+  }
 
   function render() {
     root.replaceChildren();
     root.className = 'community';
-    const back = document.createElement('a');
-    back.href = '/community/';
-    back.textContent = 'Community';
-    root.append(back);
     if (!options.configured) {
       root.append(
         el('p', 'eyebrow', 'Not configured'),
@@ -672,7 +707,25 @@ export function mountProfile(root, options) {
       root.append(el('p', 'eyebrow', 'Profile'), el('p', null, 'No community profile uses this address.'));
       return;
     }
-    root.append(el('h2', null, person.displayName));
+    const banner = el('div', 'profile-banner' + (person.hasBackground ? '' : ' is-empty'));
+    if (person.hasBackground) {
+      banner.style.backgroundImage = 'url("/api/profiles/' + encodeURIComponent(person.id) + '/background?v=' + imageVersion + '")';
+    } else {
+      banner.append(el('p', 'profile-empty', 'No background image yet'));
+    }
+    const portrait = el('div', 'profile-portrait');
+    if (person.hasPortrait) {
+      const img = document.createElement('img');
+      img.src = '/api/profiles/' + encodeURIComponent(person.id) + '/portrait?v=' + imageVersion;
+      img.alt = person.displayName;
+      portrait.append(img);
+    } else {
+      portrait.append(el('p', 'profile-empty', 'No profile picture yet'));
+    }
+    banner.append(portrait);
+    const bio = el('p', 'profile-bio');
+    bio.textContent = person.bio ? person.bio : 'No bio yet.';
+    root.append(banner, el('h2', null, person.displayName), bio);
     root.append(el('p', 'community-note', 'This is a Chess community profile. It does not show an email address or any other service.'));
     if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
     if (viewer && viewer.id === person.id) {
@@ -687,15 +740,46 @@ export function mountProfile(root, options) {
         if (!result.ok) { error = result.error; render(); return; }
         load(async () => {
           const saved = await gateway.saveProfile(result.value);
-          person = { id: saved.id, displayName: saved.displayName, createdAt: person.createdAt };
+          person = Object.assign({}, person, { displayName: saved.displayName });
         });
       });
+      const bioInput = document.createElement('textarea');
+      bioInput.maxLength = 280;
+      bioInput.rows = 3;
+      bioInput.value = person.bio || '';
+      const saveBio = el('button', 'tool', 'Save bio');
+      saveBio.type = 'button';
+      saveBio.addEventListener('click', () => load(async () => {
+        const editingId = person.id;
+        const session = await gateway.profile();
+        if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
+        const next = String(bioInput.value || '').replace(/\r\n/g, '\n').trim();
+        if (next.length > 280) throw new Error('A bio can be at most 280 characters.');
+        const saved = await gateway.saveProfileBio(next, editingId);
+        person = saved;
+      }));
+      const portraitInput = document.createElement('input');
+      portraitInput.type = 'file';
+      portraitInput.accept = 'image/jpeg,image/png,image/webp';
+      portraitInput.id = 'portrait-file';
+      const backgroundInput = document.createElement('input');
+      backgroundInput.type = 'file';
+      backgroundInput.accept = 'image/jpeg,image/png,image/webp';
+      backgroundInput.id = 'background-file';
+      const savePortrait = el('button', 'tool', 'Save profile picture');
+      savePortrait.type = 'button';
+      savePortrait.addEventListener('click', () => load(() => saveImage('portrait', portraitInput)));
+      const saveBackground = el('button', 'tool', 'Save background image');
+      saveBackground.type = 'button';
+      saveBackground.addEventListener('click', () => load(() => saveImage('background', backgroundInput)));
       const tools = el('div', 'community-tools');
-      tools.append(name, button);
+      tools.append(name, button, field('Bio', bioInput), saveBio, field('Profile picture', portraitInput), savePortrait, field('Background image', backgroundInput), saveBackground);
       root.append(tools);
     }
     const list = el('div', 'community-list');
+    list.append(el('h3', null, 'Posts'));
     if (!posts.length) list.append(el('p', null, 'No public posts yet.'));
+    posts.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || String(b.id).localeCompare(String(a.id)));
     posts.forEach((post) => {
       const article = el('article', 'community-post');
       const title = el('h3');
