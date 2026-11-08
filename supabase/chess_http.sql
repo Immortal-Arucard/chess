@@ -187,11 +187,15 @@ begin
   if (payload->>'expectedProfileId') is null or (payload->>'expectedProfileId')::uuid is distinct from actor then
     raise exception 'This game belongs to a different Chess account.';
   end if;
+  perform pg_advisory_xact_lock(hashtextextended('saves:' || actor::text, 0));
   perform pg_advisory_xact_lock(hashtextextended(actor::text || ':' || game_id::text, 0));
   if coalesce(payload->>'rated', 'false') <> 'false' or game_hash is null or char_length(game_hash) <> 64 then
     raise exception 'Chess does not store a rated result.';
   end if;
-  if jsonb_typeof(payload->'moves') <> 'array' or jsonb_array_length(payload->'moves') < 1 or jsonb_array_length(payload->'moves') > 400 then
+  if jsonb_typeof(payload->'moves') <> 'array' or jsonb_array_length(payload->'moves') > 400 then
+    raise exception 'A saved game must include every move.';
+  end if;
+  if jsonb_array_length(payload->'moves') = 0 and payload->>'termination' is distinct from 'resign' then
     raise exception 'A saved game must include every move.';
   end if;
   select * into existing from chess_private.bot_games games
@@ -202,6 +206,10 @@ begin
       return jsonb_build_object('status', 'saved', 'id', existing.id, 'duplicate', true);
     end if;
     raise exception 'This game was already saved with different moves.';
+  end if;
+  perform chess_private.bump_rate(actor, 'saves', 30);
+  if (select count(*) from chess_private.bot_games games where games.profile_id = actor) >= 20 then
+    raise exception 'This account has reached the saved-game limit.';
   end if;
   insert into chess_private.bot_games (
     profile_id, client_game_id, pgn, start_fen, moves, result, termination, player_color,
@@ -267,6 +275,97 @@ drop function if exists public.chess_take_code(text);
 drop function if exists public.chess_accept_login(uuid, text, text);
 drop function if exists public.chess_save_game(text, jsonb);
 
+create function chess_service.reply_page(raw_token text, parent_id uuid, after_time timestamptz, after_id uuid, page_limit integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  result jsonb;
+  actor uuid;
+  admin boolean := false;
+begin
+  if raw_token is not null then
+    select sessions.profile_id into actor from chess_private.load_session(raw_token) sessions;
+    admin := actor is not null and chess_private.profile_is_admin(actor);
+  end if;
+  select coalesce(jsonb_agg(row_json), '[]'::jsonb) into result
+  from (
+    select jsonb_build_object(
+      'id', replies.id,
+      'postId', replies.post_id,
+      'authorId', replies.author_id,
+      'authorName', profiles.display_name,
+      'body', replies.body,
+      'createdAt', replies.created_at
+    ) as row_json
+    from public.chess_replies replies
+    join public.chess_profiles profiles on profiles.id = replies.author_id
+    where replies.post_id = parent_id
+      and (
+        (replies.hidden_at is null and exists (
+          select 1 from public.chess_posts posts
+          where posts.id = replies.post_id and posts.hidden_at is null
+        ))
+        or admin
+      )
+      and (after_time is null or (replies.created_at, replies.id) > (after_time, after_id))
+    order by replies.created_at, replies.id
+    limit least(greatest(coalesce(page_limit, 20), 1), 20)
+  ) page;
+  return result;
+end;
+$$;
+
+create function chess_service.game_page(raw_token text, before_time timestamptz, before_id uuid, page_limit integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor uuid;
+  result jsonb;
+begin
+  actor := chess_private.as_profile(raw_token);
+  select coalesce(jsonb_agg(row_json), '[]'::jsonb) into result
+  from (
+    select jsonb_build_object(
+      'id', games.id,
+      'clientGameId', games.client_game_id,
+      'pgn', games.pgn,
+      'startFen', games.start_fen,
+      'moves', games.moves,
+      'result', games.result,
+      'termination', games.termination,
+      'playerColor', games.player_color,
+      'opponentName', games.opponent_name,
+      'opponentUciElo', games.opponent_uci_elo,
+      'rated', games.rated,
+      'pieceStyle', games.piece_style,
+      'pieceColor', games.piece_color,
+      'palette', games.palette,
+      'revision', games.revision,
+      'createdAt', games.created_at
+    ) as row_json
+    from chess_private.bot_games games
+    where games.profile_id = actor
+      and (before_time is null or (games.created_at, games.id) < (before_time, before_id))
+    order by games.created_at desc, games.id desc
+    limit least(greatest(coalesce(page_limit, 20), 1), 20)
+  ) page;
+  return result;
+end;
+$$;
+
+revoke all on function chess_service.reply_page(text, uuid, timestamptz, uuid, integer) from public, anon, authenticated, chess_api;
+revoke all on function chess_service.game_page(text, timestamptz, uuid, integer) from public, anon, authenticated, chess_api;
+grant execute on function chess_service.reply_page(text, uuid, timestamptz, uuid, integer) to chess_server;
+grant execute on function chess_service.game_page(text, timestamptz, uuid, integer) to chess_server;
+revoke all on function chess_service.chess_replies(text, uuid) from chess_server;
+revoke all on function chess_service.chess_games(text) from chess_server;
+
 revoke all on function chess_service.chess_revoke_master(uuid) from public, anon, authenticated, chess_api, chess_server;
 grant execute on function chess_service.chess_revoke_master(uuid) to chess_authority;
 grant execute on function chess_service.chess_cleanup() to chess_server;
@@ -283,8 +382,6 @@ grant execute on function chess_service.chess_report(text, uuid, uuid, text) to 
 grant execute on function chess_service.chess_hide_post(text, uuid) to chess_server;
 grant execute on function chess_service.chess_settings(text) to chess_server;
 grant execute on function chess_service.chess_settings_set(text, boolean) to chess_server;
-grant execute on function chess_service.chess_games(text) to chess_server;
-grant execute on function chess_service.chess_replies(text, uuid) to chess_server;
 grant execute on function chess_service.chess_posts(text, timestamptz, uuid, integer) to chess_server;
 
 commit;

@@ -146,6 +146,24 @@ function startMaster() {
   return { server, challenges };
 }
 
+function assertReleaseRollsBack() {
+  const name = 'chess_rollback_' + randomBytes(3).toString('hex');
+  psql('postgres', `create database ${name}`);
+  psql(name, `create schema if not exists auth; create table auth.users (id uuid primary key); do $$ begin create role anon nologin; exception when duplicate_object then null; end $$; do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$; create schema if not exists extensions; create extension if not exists pgcrypto schema extensions;`);
+  const release = readFileSync(new URL('../supabase/chess_release.sql', import.meta.url), 'utf8');
+  if ((release.match(/\bbegin\s*;/gi) || []).length !== 1 || (release.match(/\bcommit\s*;/gi) || []).length !== 1 || release.includes('\\ir')) {
+    throw new Error('chess_release.sql is not one plain SQL transaction');
+  }
+  const broken = release.replace(/\bcommit\s*;\s*$/i, "do $$ begin raise exception 'intentional rollback'; end $$;\n");
+  let failed = false;
+  try { psql(name, broken); } catch (err) { failed = true; }
+  if (!failed) throw new Error('the broken migration committed');
+  const args = ['-d', name, '-tA', '-c', "select count(*) from pg_namespace where nspname in ('chess_private','chess_service')"];
+  const probe = spawnSync(process.env.PGHOST ? 'psql' : 'sudo', process.env.PGHOST ? args : ['-u', 'postgres', 'psql', ...args], { encoding: 'utf8', env: process.env });
+  if (probe.stdout.trim() !== '0') throw new Error('rollback left schemas ' + probe.stdout + probe.stderr);
+  psql('postgres', `drop database if exists ${name}`);
+}
+assertReleaseRollsBack();
 const master = startMaster();
 await new Promise((resolve) => master.server.listen(0, '127.0.0.1', resolve));
 const masterPort = master.server.address().port;
@@ -210,6 +228,12 @@ const post = await request(port, ada, 'POST', '/api/posts', { body: 'Hello board
 assert.equal(post.status, 200, post.text);
 const reply = await request(port, bob, 'POST', '/api/replies', { postId: post.json.id, body: 'Hello Ada' }, { 'x-csrf-token': bob.get('chess_csrf') });
 assert.equal(reply.status, 200, reply.text);
+await request(port, bob, 'POST', '/api/replies', { postId: post.json.id, body: 'Second' }, { 'x-csrf-token': bob.get('chess_csrf') });
+const replyPage = await request(port, ada, 'POST', '/api/replies/list', { postId: post.json.id, limit: 1 }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(replyPage.json.replies.length, 1);
+const replyNext = await request(port, ada, 'POST', '/api/replies/list', { postId: post.json.id, limit: 1, before: replyPage.json.replies[0].createdAt, beforeId: replyPage.json.replies[0].id }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(replyNext.json.replies.length, 1);
+assert.notEqual(replyNext.json.replies[0].id, replyPage.json.replies[0].id);
 const anonPosts = await request(port, cookieJar(), 'GET', '/api/posts');
 assert.equal(anonPosts.json.posts.length, 1);
 const wrongOrigin = await request(port, bob, 'POST', '/api/posts/delete', { id: post.json.id }, { origin: 'https://evil.example', 'x-csrf-token': bob.get('chess_csrf') });
@@ -290,6 +314,20 @@ assert.equal(burst.some((item) => item.status !== 200), true);
 psql(db, `update chess_private.browser_sessions set idle_expires_at = clock_timestamp() - interval '1 minute' where master_id = '${bobMaster}'`);
 const expired = await request(port, bob, 'POST', '/api/settings', {}, { 'x-csrf-token': bob.get('chess_csrf') });
 assert.notEqual(expired.status, 200);
+const feed1 = await request(port, cookieJar(), 'GET', '/api/posts?limit=2');
+assert.equal(feed1.json.posts.length, 2);
+const feed2 = await request(port, cookieJar(), 'GET', '/api/posts?limit=2&before=' + encodeURIComponent(feed1.json.posts[1].createdAt) + '&beforeId=' + feed1.json.posts[1].id);
+assert.equal(feed2.json.posts.some((item) => feed1.json.posts.some((first) => first.id === item.id)), false);
+let savedCount = 1;
+while (savedCount < 20) {
+  const extra = Object.assign({}, record, { clientGameId: '66666666-6666-4666-8666-' + String(savedCount).padStart(12, '0') });
+  const result = await request(port, ada, 'POST', '/api/games', extra, { 'x-csrf-token': ada.get('chess_csrf') });
+  assert.equal(result.status, 200, result.text);
+  savedCount += 1;
+}
+const capped = await request(port, ada, 'POST', '/api/games', Object.assign({}, record, { clientGameId: '77777777-7777-4777-8777-777777777777' }), { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(capped.status, 400);
+assert.equal(capped.json.error, 'This account has reached the saved-game limit.');
 const oldCookie = ada.header();
 await request(port, ada, 'POST', '/api/logout', {}, { 'x-csrf-token': ada.get('chess_csrf') });
 const stale = await fetch('http://127.0.0.1:' + port + '/api/settings', {
@@ -302,8 +340,31 @@ const replayed = await request(port, ada, 'POST', '/api/posts', { body: 'after l
 assert.equal(replayed.status, 401);
 const setting = await pool.query("select current_setting('chess.profile_id', true) as profile");
 assert.equal(setting.rows[0].profile || '', '');
-const revoked = await pool.query("select has_function_privilege('chess_server', 'chess_service.chess_revoke_master(uuid)', 'execute') as allowed");
+const revoked = await pool.query("select has_function_privilege('chess_server', 'chess_service.chess_revoke_master(uuid)', 'execute') as allowed, (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'chess_%') as public_definers");
 assert.equal(revoked.rows[0].allowed, false);
+const authority = await pool.query("select has_function_privilege('chess_authority', 'chess_service.chess_revoke_master(uuid)', 'execute') as allowed");
+assert.equal(authority.rows[0].allowed, true);
+assert.equal(Number(revoked.rows[0].public_definers), 0);
+const workerMod = await import('./worker.mjs');
+const workerEnv = {
+  HYPERDRIVE: { connectionString: 'postgres://chess_server:' + encodeURIComponent(password) + '@127.0.0.1:5432/' + db },
+  CHESS_ORIGIN: origin,
+  SUPABASE_URL: 'http://127.0.0.1:' + masterPort,
+  SUPABASE_ANON_KEY: 'publishable-test-key'
+};
+const firstWorker = await workerMod.default.fetch(new Request(origin + '/api/session'), workerEnv);
+const both = await Promise.all([
+  workerMod.default.fetch(new Request(origin + '/api/session'), workerEnv),
+  workerMod.default.fetch(new Request(origin + '/api/posts'), workerEnv)
+]);
+assert.equal(firstWorker.status, 200);
+assert.equal(both[0].status, 200);
+assert.equal(both[1].status, 200);
+const failedWorker = await workerMod.default.fetch(new Request(origin + '/api/session'), Object.assign({}, workerEnv, { HYPERDRIVE: { connectionString: 'postgres://chess_server:wrong@127.0.0.1:1/none' } }));
+assert.equal(failedWorker.status, 503);
+const afterFailure = await workerMod.default.fetch(new Request(origin + '/api/session'), workerEnv);
+assert.equal(afterFailure.status, 200);
+await workerMod.default.scheduled(null, workerEnv);
 live.server.close();
 master.server.close();
 await pool.end();

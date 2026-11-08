@@ -146,7 +146,10 @@ export function buildGameRecord(input) {
     black: headers.Black,
     finalFen: game.fen(),
     moves,
-    boundAccountId: input.boundAccountId || null
+    boundAccountId: input.boundAccountId || null,
+    pieceStyle: input.pieceStyle || 'standard',
+    pieceColor: input.pieceColor || 'ink',
+    palette: input.palette || 'midnight'
   };
   Object.freeze(record.moves);
   record.moves.forEach((move) => Object.freeze(move));

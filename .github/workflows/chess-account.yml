@@ -34,4 +34,9 @@ jobs:
       - run: node assets/chess/bot-results.test.mjs
       - run: node assets/chess/community-model.test.mjs
       - run: node server/game-record.test.mjs
+      - run: node server/worker.test.mjs
       - run: node server/integration.test.mjs
+      - run: node server/wrangler-entry.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"

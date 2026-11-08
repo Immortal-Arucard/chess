@@ -1,10 +1,11 @@
 import pg from 'pg';
 import { createChessApp } from './chess-api.mjs';
 
-// Each request opens and closes its own database client. There is no process-wide
-// pool, because a Worker isolate must not keep the first Hyperdrive client alive.
-// Hyperdrive caching must be disabled. The free plan includes 100,000 queries a day:
+// Production Worker entry. Each request and each scheduled run opens its own
+// pg client from the cache-disabled Hyperdrive binding and closes it, including
+// when connect or the handler fails. There is no module-level client.
 // https://developers.cloudflare.com/hyperdrive/platform/pricing/
+// https://developers.cloudflare.com/workers/tutorials/postgres/
 
 export function routeApi(pathname) {
   return String(pathname || '').startsWith('/api/');
@@ -17,60 +18,109 @@ export function trustedClientIp(request) {
 }
 
 function oneClientPool(client) {
-  let closed = false;
   return {
     async connect() {
-      if (closed) throw new Error('The database client is closed.');
       return {
         query: (text, params) => client.query(text, params),
         release() {}
       };
-    },
-    async end() {
-      closed = true;
-      await client.end();
     }
   };
 }
 
-export async function handleWorkerRequest(request, env, deps) {
+function bridge(app, request) {
   const url = new URL(request.url);
-  if (!routeApi(url.pathname)) return new Response(null, { status: 404 });
-  const connectionString = env && env.HYPERDRIVE && env.HYPERDRIVE.connectionString;
-  if (!connectionString) {
-    return new Response(JSON.stringify({ error: 'Chess accounts are not configured.' }), {
-      status: 503,
-      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
-    });
-  }
-  const Client = deps.Client;
-  const client = new Client({ connectionString });
-  await client.connect();
-  const pool = oneClientPool(client);
+  const headers = {};
+  request.headers.forEach((value, key) => { headers[key] = value; });
+  const req = {
+    method: request.method,
+    url: url.pathname + url.search,
+    headers,
+    socket: { remoteAddress: '' },
+    async *[Symbol.asyncIterator]() {
+      if (request.body) {
+        const buf = Buffer.from(await request.arrayBuffer());
+        if (buf.length) yield buf;
+      }
+    }
+  };
+  return new Promise((resolve, reject) => {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      writeHead(status, hdrs) {
+        this.statusCode = status;
+        this.headers = hdrs || {};
+      },
+      end(payload) {
+        const out = new Headers();
+        for (const [key, value] of Object.entries(this.headers)) {
+          if (String(key).toLowerCase() === 'set-cookie' && Array.isArray(value)) value.forEach((cookie) => out.append('set-cookie', cookie));
+          else if (value != null) out.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+        }
+        resolve(new Response(payload == null ? null : String(payload), { status: this.statusCode, headers: out }));
+      }
+    };
+    Promise.resolve(app.handle(req, res)).catch(reject);
+  });
+}
+
+async function withClient(connectionString, run) {
+  const client = new pg.Client({ connectionString });
+  let connected = false;
   try {
-    const app = deps.createApp({
-      pool,
-      origin: env.CHESS_ORIGIN,
-      supabaseUrl: env.SUPABASE_URL,
-      supabaseKey: env.SUPABASE_ANON_KEY,
-      fetchImpl: deps.fetchImpl
-    });
-    return await deps.invoke(app, request, trustedClientIp(request));
+    await client.connect();
+    connected = true;
+    return await run(client);
   } finally {
-    await pool.end();
+    if (connected) {
+      try { await client.end(); } catch (err) { /* the connection is already closed */ }
+    }
   }
 }
 
-export async function runCleanup(env, deps) {
-  const connectionString = env && env.HYPERDRIVE && env.HYPERDRIVE.connectionString;
-  if (!connectionString) return;
-  const client = new deps.Client({ connectionString });
-  await client.connect();
-  try {
-    await client.query('begin');
-    await client.query('select chess_service.chess_cleanup()');
-    await client.query('commit');
-  } finally {
-    await client.end();
+const worker = {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (!routeApi(url.pathname)) return new Response(null, { status: 404 });
+    const connectionString = env && env.HYPERDRIVE && env.HYPERDRIVE.connectionString;
+    if (!connectionString) {
+      return new Response(JSON.stringify({ error: 'Chess accounts are not configured.' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
+      });
+    }
+    try {
+      return await withClient(connectionString, (client) => {
+        const app = createChessApp({
+          pool: oneClientPool(client),
+          origin: env.CHESS_ORIGIN,
+          supabaseUrl: env.SUPABASE_URL,
+          supabaseKey: env.SUPABASE_ANON_KEY
+        });
+        return bridge(app, request);
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Chess accounts are not reachable.' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
+      });
+    }
+  },
+  async scheduled(_event, env) {
+    const connectionString = env && env.HYPERDRIVE && env.HYPERDRIVE.connectionString;
+    if (!connectionString) return;
+    await withClient(connectionString, async (client) => {
+      await client.query('begin');
+      try {
+        await client.query('select chess_service.chess_cleanup()');
+        await client.query('commit');
+      } catch (err) {
+        try { await client.query('rollback'); } catch (ignore) { /* rollback failed */ }
+        throw err;
+      }
+    });
   }
-}
+};
+
+export default worker;

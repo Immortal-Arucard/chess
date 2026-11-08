@@ -40,7 +40,10 @@ export function validateGame(record) {
   }
   if (!ELOS.has(Number(record.opponentUciElo))) throw new Error('That engine target is not one of the saved choices.');
   if (!['white', 'black'].includes(record.playerColor)) throw new Error('The player side is missing.');
-  if (!Array.isArray(record.moves) || record.moves.length < 1 || record.moves.length > 400) {
+  if (!Array.isArray(record.moves) || record.moves.length > 400) {
+    throw new Error('A saved game must include every move.');
+  }
+  if (record.moves.length === 0 && record.termination !== 'resign') {
     throw new Error('A saved game must include every move.');
   }
   if (typeof record.pgn !== 'string' || record.pgn.length < 1 || record.pgn.length > 20000) {
@@ -76,7 +79,8 @@ export function validateGame(record) {
     throw new Error('The PGN does not match the starting position.');
   }
   const finalFen = game.fen();
-  if (loaded.fen() !== finalFen || record.moves[record.moves.length - 1].fen !== finalFen) {
+  const listedFinal = record.moves.length ? record.moves[record.moves.length - 1].fen : (record.startFen || STANDARD_FEN);
+  if (loaded.fen() !== finalFen || listedFinal !== finalFen) {
     throw new Error('The PGN does not match the move list.');
   }
   const mateResult = game.isCheckmate() ? (game.turn() === 'w' ? '0-1' : '1-0') : null;

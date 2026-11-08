@@ -292,8 +292,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].reply);
       }
       if (url.pathname === '/api/replies/list') {
-        const result = await query('select chess_service.chess_replies($1, $2) as replies', [token, body.postId]);
-        return send(200, { replies: result.rows[0].replies });
+        const result = await query('select chess_service.reply_page($1, $2, $3, $4, $5) as replies', [
+          token, body.postId, body.before || null, body.beforeId || null, boundedLimit(body.limit)
+        ]);
+        return send(200, { replies: result.rows[0].replies, limit: boundedLimit(body.limit) });
       }
       if (url.pathname === '/api/replies/delete') {
         const result = await query('select chess_service.chess_delete_reply($1, $2) as deleted', [token, body.id]);
@@ -320,8 +322,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].saved);
       }
       if (url.pathname === '/api/games/list') {
-        const result = await query('select chess_service.chess_games($1) as games', [token]);
-        return send(200, { games: result.rows[0].games });
+        const result = await query('select chess_service.game_page($1, $2, $3, $4) as games', [
+          token, body.before || null, body.beforeId || null, boundedLimit(body.limit)
+        ]);
+        return send(200, { games: result.rows[0].games, limit: boundedLimit(body.limit) });
       }
       return send(404, { error: 'Not found.' });
     } catch (error) {
