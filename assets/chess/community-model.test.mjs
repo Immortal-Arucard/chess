@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan } from './community-model.js';
+import { cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
 import { assertPublishable, communityConfig } from './community-config.js';
 
 const name = cleanName('  Ada  Lovelace ');
@@ -39,11 +39,25 @@ const serviceJwt = 'aaa.' + Buffer.from(JSON.stringify({ role: 'service_role' })
 assert.throws(() => assertPublishable(serviceJwt), /Refusing/);
 assert.doesNotThrow(() => assertPublishable('sb_publishable_example'));
 
+const ada = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+assert.equal(profilePath(ada), '/community/profile/?id=' + ada);
+assert.deepEqual(profileRoute({ pathname: '/community/', search: '' }).page, 'feed');
+assert.equal(profileRoute({ pathname: '/community/profile/', search: '' }).reason, 'missing');
+assert.equal(profileRoute({ pathname: '/community/profile/', search: '?id=ada' }).reason, 'invalid');
+assert.equal(profileRoute({ pathname: '/community/profile/index.html', search: '?id=' + ada }).id, ada);
+const shown = publicProfile({ id: ada, display_name: 'Ada', created_at: '2026-11-08T00:00:00Z', email: 'ada@example.com' });
+assert.deepEqual(shown, { id: ada, displayName: 'Ada', createdAt: '2026-11-08T00:00:00Z' });
+assert.equal(Object.hasOwn(shown, 'email'), false);
+
 const sql = readFileSync(new URL('../../supabase/chess_community.sql', import.meta.url), 'utf8');
 for (const table of ['chess_profiles', 'chess_admins', 'chess_posts', 'chess_replies', 'chess_reports']) {
   assert.match(sql, new RegExp('alter table public\\.' + table + ' enable row level security'));
   assert.match(sql, new RegExp('alter table public\\.' + table + ' force row level security'));
 }
+assert.match(sql, /chess_posts_by_author/);
+assert.match(sql, /using \(id = \(select auth\.uid\(\)\)\)/);
+assert.match(sql, /with check \(id = \(select auth\.uid\(\)\)\)/);
+assert.doesNotMatch(sql, /email text/i);
 assert.equal(sql.includes('public.profiles'), false);
 assert.equal(sql.includes('public.results'), false);
 assert.doesNotMatch(sql, /table public\.test_events|from public\.test_events/);

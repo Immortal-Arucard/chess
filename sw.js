@@ -25,6 +25,8 @@ const ASSETS = [
   '/analysis/index.html',
   '/community/',
   '/community/index.html',
+  '/community/profile/',
+  '/community/profile/index.html',
   '/marketplace/',
   '/marketplace/index.html',
   '/exchange/',

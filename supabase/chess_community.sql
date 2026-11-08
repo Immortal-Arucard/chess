@@ -9,6 +9,7 @@ create table public.chess_profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
   created_at timestamptz not null default now(),
+  -- Email and other auth account fields stay in auth.users and are not copied here.
   constraint chess_profiles_display_name_len check (char_length(display_name) between 1 and 40),
   constraint chess_profiles_display_name_text check (display_name !~ '[[:cntrl:]]')
 );
@@ -54,6 +55,7 @@ create table public.chess_reports (
 );
 
 create index chess_posts_feed on public.chess_posts (created_at desc, id desc);
+create index chess_posts_by_author on public.chess_posts (author_id, created_at desc, id desc);
 create index chess_replies_thread on public.chess_replies (post_id, created_at, id);
 create index chess_reports_recent on public.chess_reports (created_at desc);
 
@@ -77,6 +79,8 @@ create policy chess_profiles_insert on public.chess_profiles
   for insert to authenticated
   with check (id = (select auth.uid()));
 
+-- A signed-in member can rename only the profile whose id is auth.uid().
+-- An update that names another member matches no row.
 create policy chess_profiles_update on public.chess_profiles
   for update to authenticated
   using (id = (select auth.uid()))

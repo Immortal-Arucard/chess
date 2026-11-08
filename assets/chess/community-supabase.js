@@ -75,6 +75,21 @@ export function createSupabaseGateway(client) {
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }
       return { id: result.data.id, displayName: result.data.display_name };
     },
+    async getPublicProfile(id) {
+      const result = await client.from('chess_profiles').select('id,display_name,created_at').eq('id', id).maybeSingle();
+      if (result.error) throw failed(result.error);
+      if (!result.data) return null;
+      return { id: result.data.id, displayName: result.data.display_name, createdAt: result.data.created_at };
+    },
+    async listAuthorPosts(authorId, { cursor, limit }) {
+      let query = client.from('chess_posts').select(POST_COLUMNS).eq('author_id', authorId).is('hidden_at', null).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
+      const filter = feedFilter(cursor);
+      if (filter) query = query.or(filter);
+      const result = await query;
+      if (result.error) throw failed(result.error);
+      const posts = (result.data || []).map(shapePost);
+      return { posts, nextCursor: nextCursor(posts, limit) };
+    },
     async listPosts({ cursor, limit }) {
       let query = client.from('chess_posts').select(POST_COLUMNS).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
       const filter = feedFilter(cursor);

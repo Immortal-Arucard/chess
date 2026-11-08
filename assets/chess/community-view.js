@@ -1,10 +1,17 @@
-import { LIMITS, cleanBody, cleanEmail, cleanName, cleanReason } from './community-model.js';
+import { LIMITS, cleanBody, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
+}
+
+function authorLink(name, id) {
+  const link = document.createElement('a');
+  link.href = profilePath(id);
+  link.textContent = name;
+  return link;
 }
 
 function field(labelText, control) {
@@ -164,6 +171,10 @@ export function mountCommunity(root, options) {
 
   function feed() {
     const heading = el('p', null, 'Signed in as ' + profile.displayName + '.');
+    const ownProfile = document.createElement('a');
+    ownProfile.href = profilePath(profile.id);
+    ownProfile.textContent = 'Your profile';
+    heading.append(document.createTextNode(' '), ownProfile);
     const rename = document.createElement('input');
     rename.type = 'text';
     rename.maxLength = LIMITS.name;
@@ -218,11 +229,9 @@ export function mountCommunity(root, options) {
 
   function postArticle(post) {
     const article = el('article', 'community-post');
-    article.append(
-      el('h3', null, post.authorName),
-      el('p', 'community-time', post.createdAt),
-      textBlock(post.body)
-    );
+    const title = el('h3');
+    title.append(authorLink(post.authorName, post.authorId));
+    article.append(title, el('p', 'community-time', post.createdAt), textBlock(post.body));
     if (post.hidden) article.append(el('p', 'community-note', 'Hidden from other members.'));
     const bar = el('div', 'community-tools');
     if (post.authorId === user.id) bar.append(deleteButton('Delete post', () => gateway.deletePost(post.id).then(loadFirst)));
@@ -254,7 +263,9 @@ export function mountCommunity(root, options) {
 
   function replyArticle(reply) {
     const block = el('div', 'community-reply');
-    block.append(el('h4', null, reply.authorName), el('p', 'community-time', reply.createdAt), textBlock(reply.body));
+    const title = el('h4');
+    title.append(authorLink(reply.authorName, reply.authorId));
+    block.append(title, el('p', 'community-time', reply.createdAt), textBlock(reply.body));
     if (reply.hidden) block.append(el('p', 'community-note', 'Hidden from other members.'));
     if (reply.authorId === user.id) {
       block.append(deleteButton('Delete reply', () => gateway.deleteReply(reply.id).then(async () => {
@@ -343,4 +354,125 @@ export function mountCommunity(root, options) {
   } else render();
 
   return { render };
+}
+
+export function mountProfile(root, options) {
+  const gateway = options.gateway || null;
+  let phase = options.configured && options.valid ? 'loading' : 'ready';
+  let error = '';
+  let person = null;
+  let viewer = null;
+  let posts = [];
+  let cursor = null;
+
+  function render() {
+    root.replaceChildren();
+    root.className = 'community';
+    const back = document.createElement('a');
+    back.href = '/community/';
+    back.textContent = 'Community';
+    root.append(back);
+    if (!options.configured) {
+      root.append(
+        el('p', 'eyebrow', 'Not configured'),
+        el('p', null, 'Profile pages need the Chess database migration and a publishable key. No member is shown, and nothing is stored on this device.')
+      );
+      return;
+    }
+    if (!options.valid) {
+      root.append(
+        el('p', 'eyebrow', 'Profile'),
+        el('p', 'community-error', options.reason === 'missing'
+          ? 'This address does not name a member.'
+          : 'That profile address is not valid.')
+      );
+      return;
+    }
+    if (phase === 'loading') {
+      root.append(el('p', 'eyebrow', 'Loading profile'), el('p', null, 'Loading this profile. No posts are stored on this device.'));
+      return;
+    }
+    if (error) {
+      const alert = el('p', 'community-error', error);
+      alert.setAttribute('role', 'alert');
+      root.append(alert);
+    }
+    if (!person) {
+      root.append(el('p', 'eyebrow', 'Profile'), el('p', null, 'No community profile uses this address.'));
+      return;
+    }
+    root.append(el('h2', null, person.displayName));
+    if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
+    if (viewer && viewer.id === person.id) {
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.maxLength = LIMITS.name;
+      name.value = person.displayName;
+      const button = el('button', 'tool', 'Save display name');
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        const result = cleanName(name.value);
+        if (!result.ok) { error = result.error; render(); return; }
+        load(async () => {
+          const saved = await gateway.saveProfile(result.value);
+          person = { id: saved.id, displayName: saved.displayName, createdAt: person.createdAt };
+        });
+      });
+      const tools = el('div', 'community-tools');
+      tools.append(name, button);
+      root.append(tools);
+    }
+    const list = el('div', 'community-list');
+    if (!posts.length) list.append(el('p', null, 'No public posts yet.'));
+    posts.forEach((post) => {
+      const article = el('article', 'community-post');
+      const title = el('h3');
+      title.append(authorLink(post.authorName, post.authorId));
+      article.append(title, el('p', 'community-time', post.createdAt));
+      const body = el('p', 'community-body');
+      body.textContent = post.body;
+      article.append(body);
+      list.append(article);
+    });
+    if (cursor) {
+      const more = el('button', 'tool', 'Older posts');
+      more.type = 'button';
+      more.addEventListener('click', () => load(async () => {
+        const page = await gateway.listAuthorPosts(person.id, { cursor, limit: LIMITS.pageSize });
+        posts = posts.concat(page.posts);
+        cursor = page.nextCursor;
+      }));
+      list.append(more);
+    }
+    root.append(list);
+  }
+
+  async function load(action) {
+    error = '';
+    render();
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error('You appear to be offline. Community posts are not stored on this device.');
+      }
+      await action();
+    } catch (err) {
+      error = err && err.message ? err.message : 'The profile could not be loaded.';
+    }
+    phase = 'ready';
+    render();
+  }
+
+  if (!options.configured || !options.valid) {
+    render();
+    return;
+  }
+  load(async () => {
+    const session = await gateway.session();
+    viewer = session && session.user ? { id: session.user.id } : null;
+    person = await gateway.getPublicProfile(options.profileId);
+    if (!person) return;
+    const page = await gateway.listAuthorPosts(person.id, { cursor: null, limit: LIMITS.pageSize });
+    posts = page.posts;
+    cursor = page.nextCursor;
+  });
 }

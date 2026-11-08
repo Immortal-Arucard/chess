@@ -32,11 +32,12 @@ insert into public.chess_admins (user_id) values ('USER_UUID_FROM_AUTH_USERS');
 The browser cannot insert into `chess_admins`. There is no admin screen in this change. Admins can read every report and set `hidden_at` or delete a post or reply through the SQL editor or a later admin page. Reports are not shown to other members.
 
 7. Copy the project URL and the publishable key into `assets/chess/community-config.js`. The publishable key is the public client key. Refuse any key whose JWT role is `service_role`. Leave both values empty until this list is finished.
-8. Deploy the Chess site only after a manual check: magic link lands on `/community/`, a display name saves, a post and reply appear in a second browser, the author can delete them, and another account cannot.
+8. Deploy the Chess site only after a manual check: magic link lands on `/community/`, a display name saves, a post and reply appear in a second browser, the author can delete them, and another account cannot. Open `/community/profile/?id=` plus that member's user id from a second account. The page shows the display name and public posts only. It must not show the email address. The rename control appears only for the signed-in member's own id.
 
 ## Authorization rules the SQL enforces
 
-- Display names are public. Only the signed-in user can insert, rename, or delete their `chess_profiles` row, and the id must equal `auth.uid()`.
+- Display names are public. Only the signed-in user can insert, rename, or delete their `chess_profiles` row, and the id must equal `auth.uid()`. An update naming another id changes nothing. Email and the rest of `auth.users` are not columns on `chess_profiles`, and the profile query selects `id, display_name, created_at` only.
+- Each member has a stable page at `/community/profile/?id=` followed by their user id. The id does not change when the display name changes. The page lists that member's public posts, omitting rows with `hidden_at` set. There is no biography column.
 - Posts and replies require a profile. The author id must equal `auth.uid()`. Hidden rows stay visible to the author and to admins, not to everyone else.
 - Members can delete their own posts and replies. Admins can also delete or update them. Ordinary members cannot update post bodies.
 - A report must name exactly one post or one reply. The reporter reads only their own reports. Admins read all of them.

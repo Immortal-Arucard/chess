@@ -49,6 +49,31 @@ export function olderThan(row, cursor) {
   return row.createdAt === cursor.createdAt && row.id < cursor.id;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function profilePath(id) {
+  return '/community/profile/?id=' + encodeURIComponent(id);
+}
+
+export function profileRoute(location) {
+  const path = String(location.pathname || '').replace(/\/index\.html$/, '');
+  const normalized = path.endsWith('/') ? path : path + '/';
+  if (normalized !== '/community/profile/') return { page: 'feed' };
+  const id = new URLSearchParams(location.search || '').get('id') || '';
+  if (!id) return { page: 'profile', valid: false, reason: 'missing', id: '' };
+  if (!UUID.test(id)) return { page: 'profile', valid: false, reason: 'invalid', id };
+  return { page: 'profile', valid: true, reason: '', id };
+}
+
+export function publicProfile(row) {
+  if (!row || !row.id) return null;
+  return {
+    id: row.id,
+    displayName: row.display_name || row.displayName || 'Member',
+    createdAt: row.created_at || row.createdAt || ''
+  };
+}
+
 export function feedFilter(cursor) {
   if (!cursor) return null;
   const time = JSON.stringify(cursor.createdAt);

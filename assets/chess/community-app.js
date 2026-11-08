@@ -1,9 +1,25 @@
 import { assertPublishable, communityConfig } from './community-config.js';
+import { profileRoute } from './community-model.js';
 import { createSupabaseGateway } from './community-supabase.js';
-import { mountCommunity } from './community-view.js';
+import { mountCommunity, mountProfile } from './community-view.js';
 
 const root = document.getElementById('community-app');
 const config = communityConfig();
+const route = profileRoute(window.location);
+
+function show(gateway) {
+  if (route.page === 'profile') {
+    mountProfile(root, {
+      configured: config.configured,
+      gateway,
+      valid: route.valid,
+      reason: route.reason,
+      profileId: route.id
+    });
+    return;
+  }
+  mountCommunity(root, { configured: config.configured, gateway });
+}
 
 function loadLibrary() {
   if (window.supabase && window.supabase.createClient) return Promise.resolve();
@@ -17,7 +33,7 @@ function loadLibrary() {
 }
 
 if (!config.configured) {
-  mountCommunity(root, { configured: false });
+  show(null);
 } else {
   loadLibrary().then(() => {
     assertPublishable(config.key);
@@ -30,8 +46,8 @@ if (!config.configured) {
       }
     });
     const gateway = createSupabaseGateway(client);
-    mountCommunity(root, { configured: true, gateway });
-    gateway.listen();
+    show(gateway);
+    if (route.page === 'feed') gateway.listen();
   }).catch((error) => {
     root.textContent = error.message || 'Community sign-in could not start.';
   });
