@@ -18,6 +18,14 @@ The reviewed migration and Worker are already in place. Do not apply the migrati
 
 `GET /api/auth/start` returns 405. Sign-in is a POST.
 
+On 8 November 2026 at 3:03 PM EST, an emailed link returned to Community still signed out, with “The request could not be completed.” From 2:55 to 3:05:30 PM the Worker recorded six `GET /api/session` responses at 200, one `POST /api/auth/start` at 200, one `POST /api/auth/start` at 400, two `GET /api/auth/callback` responses at 303, and one canceled callback. No 5xx was returned. A 303 is also how this service redirects a rejected callback, so those 303s are not proof that a session cookie was set. The generic sentence is the fallback for a 400 whose message is not in the public list; the sign-in form displays that response. Session 200 with the signed-out page is a separate result from the callback. The provider settings response showed Google and email enabled. That flag does not prove the Google client credentials or consent screen. No response bodies, cookies, or private logs were read for this incident.
+
+## Google sign-in
+
+Continue with Google uses the same opaque Chess session as the email link. The browser is sent to Google, then to `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`, then back to `https://chess.theworldgovernmentincorporated.com/api/auth/callback` with a one-time code. Chess exchanges that code on the server. The page does not receive a master token. Joining Chess is still a separate button.
+
+Before this works in production, the parent deploys the new Worker bundle. Do not apply `supabase/chess_release.sql` again. In Google Cloud, the authorized redirect URI remains `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`. The Chess callback is already on the Supabase allowlist. The Google provider stays enabled with its client id and secret stored in Supabase, not in this repository. The publishable key remains the Worker secret `SUPABASE_ANON_KEY` and is not placed on the Google URL.
+
 ## Next candidate
 
 This branch is the candidate for the next real check. Publishing it replaces the temporary sign-in page with the community page: email sign-in, an explicit Join Chess step, posts, and the bot’s account save, discard, recovery, and board replay. The bot’s existing colors, piece sets, and strength choices stay. The Worker and SQL bytes stay the reviewed `1925b2a8` bytes. Do not reapply the migration or deploy another backend for this page.

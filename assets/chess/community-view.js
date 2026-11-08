@@ -30,6 +30,20 @@ export function mountCommunity(root, options) {
   let error = '';
   let pendingEmail = '';
   let busy = false;
+  const authNotices = {
+    browser: 'This sign-in link was opened without the browser session that requested it. Request a new link in that same browser.',
+    expired: 'This sign-in link expired or was already used. Request a new one.',
+    rejected: 'The sign-in link was not accepted. Request a new one.',
+    canceled: 'Google sign-in was canceled.'
+  };
+  try {
+    const params = new URL(window.location.href).searchParams;
+    if (authNotices[params.get('auth')]) {
+      notice = authNotices[params.get('auth')];
+      params.delete('auth');
+      window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
+    }
+  } catch (err) { /* the notice is optional */ }
   let phase = gateway && options.configured ? 'loading' : 'ready';
   const replies = new Map();
   const openReports = new Set();
@@ -112,11 +126,17 @@ export function mountCommunity(root, options) {
     const button = el('button', 'tool', busy ? 'Sending…' : 'Email me a sign-in link');
     button.type = 'submit';
     button.disabled = busy;
+    const google = el('button', 'tool', 'Continue with Google');
+    google.type = 'button';
+    google.addEventListener('click', () => run(async () => {
+      await gateway.continueWithGoogle();
+    }));
     const form = document.createElement('form');
     form.append(
       field('Email', email),
       field('Display name', name),
       button,
+      google,
       el('p', 'community-note', 'This continues at the TWGI account service. Chess does not keep that login. Joining Chess is a separate step after you return, and it does not open any other service.')
     );
     form.addEventListener('submit', (event) => {

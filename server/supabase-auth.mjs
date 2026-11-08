@@ -36,6 +36,26 @@ export function createSupabaseAuth({ url, apiKey, fetchImpl, expectedAudience = 
       });
       if (!response.ok) throw new Error('The account service could not send a sign-in link.');
     },
+    async startGoogle({ challenge, redirectTo }) {
+      const endpoint = new URL('/auth/v1/authorize', base + '/');
+      endpoint.searchParams.set('provider', 'google');
+      endpoint.searchParams.set('redirect_to', redirectTo);
+      endpoint.searchParams.set('code_challenge', challenge);
+      endpoint.searchParams.set('code_challenge_method', 's256');
+      endpoint.searchParams.set('scopes', 'email profile');
+      endpoint.searchParams.set('skip_http_redirect', 'true');
+      const response = await fetchFn(endpoint, {
+        method: 'GET',
+        headers: { apikey: apiKey },
+        cache: 'no-store'
+      });
+      const body = await response.json().catch(() => ({}));
+      const providerUrl = typeof body.url === 'string' ? body.url : '';
+      if (!response.ok || !providerUrl.startsWith('https://accounts.google.com/')) {
+        throw new Error('Google sign-in could not start.');
+      }
+      return providerUrl;
+    },
     async exchange({ code, verifier }) {
       const tokenResponse = await call('/auth/v1/token?grant_type=pkce', {
         method: 'POST',
