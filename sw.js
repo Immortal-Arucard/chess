@@ -1,4 +1,4 @@
-const CACHE = 'chess-v5';
+const CACHE = 'chess-v6';
 const ROUTES = [
   '/',
   '/theory/',
@@ -25,6 +25,8 @@ const ASSETS = [
   '/analysis/index.html',
   '/community/',
   '/community/index.html',
+  '/community/profile/',
+  '/community/profile/index.html',
   '/marketplace/',
   '/marketplace/index.html',
   '/exchange/',
@@ -40,6 +42,12 @@ const ASSETS = [
   '/assets/chess/piece-sets.js',
   '/assets/chess/piece-sets-LICENSE.txt',
   '/assets/chess/bot-results.js',
+  '/assets/chess/community.css',
+  '/assets/chess/community-config.js',
+  '/assets/chess/community-model.js',
+  '/assets/chess/community-view.js',
+  '/assets/chess/community-gateway.js',
+  '/assets/chess/community-app.js',
   '/bot/bot.js',
   '/assets/vendor/chess.js/chess.js',
   '/assets/vendor/chess.js/LICENSE',
@@ -85,6 +93,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
   const key = lookup(url.pathname);
   if (!key) return;
   event.respondWith((async () => {

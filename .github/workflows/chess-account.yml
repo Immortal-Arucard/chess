@@ -1,0 +1,49 @@
+name: Chess account
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGPORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: |
+          curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb
+      - run: npm install --prefix server
+      - run: node assets/chess/bot-results.test.mjs
+      - run: node assets/chess/community-model.test.mjs
+      - run: node server/game-record.test.mjs
+      - run: node server/worker.test.mjs
+      - run: node server/integration.test.mjs
+      - run: node server/wrangler-entry.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"
+      - run: node server/browser-e2e.mjs
+        env:
+          CI: "1"
+          CHROME_PATH: /usr/bin/google-chrome

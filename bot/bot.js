@@ -2,11 +2,12 @@ import { Chess } from '/assets/vendor/chess.js/chess.js';
 import { mountBoard } from '/assets/chess/board.js';
 import { ELO_CHOICES, PALETTES, PIECE_COLORS, PIECE_STYLES, SEARCH_MS, loadPrefs, pieceColors, savePrefs, strengthNote } from '/assets/chess/bot-prefs.js';
 import {
-  accountSettingsView,
   applySave,
   buildGameRecord,
   createResultBook,
-  loadAutoSavePreference
+  loadAutoSavePreference,
+  readDeviceRecovery,
+  rememberDeviceRecovery
 } from '/assets/chess/bot-results.js';
 import { createEngine } from '/assets/chess/engine.js';
 import { applyUci, kingSquare, legalTargets, outcome, pieceMap, pgnFor, promotionMoves } from '/assets/chess/rules.js';
@@ -42,6 +43,10 @@ let lastMove = null;
 let engineReady = false;
 let notice = '';
 let phase = 'setup';
+let clientGameId = crypto.randomUUID();
+let discardedIds = [];
+let ownerAtStart = null;
+let gameSettings = null;
 let startFen = chess.fen();
 let pending = null;
 let leaveAction = '';
@@ -50,8 +55,9 @@ const params = new URLSearchParams(location.search);
 const reviewFen = params.get('review') === '1' ? params.get('fen') : '';
 if (params.get('play') === 'b' || params.get('play') === 'w') player = params.get('play');
 
+let accountState = { available: false, reachable: false, id: null, autoSave: false };
 function currentAccount() {
-  return { available: false, id: null };
+  return accountState;
 }
 
 function today() {
@@ -96,10 +102,49 @@ function unsavedFinished() {
 }
 
 function syncAccountSettings() {
-  const view = accountSettingsView(currentAccount());
-  autoBox.checked = view.checked;
-  autoBox.disabled = view.disabled;
-  autoNote.textContent = view.note;
+  if (!accountState.reachable || !accountState.id) {
+    autoBox.checked = false;
+    autoBox.disabled = true;
+    autoNote.textContent = accountState.reachable
+      ? 'Sign in and join Chess to store automatic saving on the account. It stays off until then.'
+      : 'Chess accounts are not reachable from this page, so automatic saving stays off.';
+    return;
+  }
+  autoBox.disabled = false;
+  autoBox.checked = accountState.autoSave === true;
+  autoNote.textContent = accountState.autoSave
+    ? 'Finished bot games are saved to this Chess account, including every move.'
+    : 'Automatic saving is off for this Chess account. Use Save to account after a game.';
+}
+
+async function refreshAccount() {
+  try {
+    const response = await fetch('/api/session', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('unavailable');
+    const body = await response.json();
+    accountState = {
+      available: !!(body.profile && body.profile.id),
+      reachable: true,
+      id: body.profile ? body.profile.id : null,
+      autoSave: false
+    };
+    if (accountState.id) {
+      const settings = await fetch('/api/settings', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken() },
+        body: '{}'
+      });
+      if (settings.ok) {
+        const prefs = await settings.json();
+        accountState.autoSave = prefs.autoSaveBotResults === true;
+      }
+    }
+  } catch (err) {
+    accountState = { available: false, reachable: false, id: null, autoSave: false };
+  }
+  syncAccountSettings();
+  void loadSavedGames();
 }
 
 function render() {
@@ -156,8 +201,11 @@ function render() {
   endPanel.hidden = phase !== 'ended';
   if (phase === 'ended' && pending) {
     const count = pending.record ? pending.record.moves.length : history.length;
-    saveStatus.dataset.state = 'unsaved';
-    saveStatus.textContent = 'Not saved to an account. ' + count + (count === 1 ? ' move is' : ' moves are') + ' still in this record.';
+    const saved = pending.status === 'saved';
+    saveStatus.dataset.state = saved ? 'saved' : 'unsaved';
+    saveStatus.textContent = saved
+      ? 'Saved to your Chess account.'
+      : 'Not saved to an account. ' + count + (count === 1 ? ' move is' : ' moves are') + ' still in this record.';
     saveDetail.textContent = pending.error || notice || '';
   } else {
     saveStatus.dataset.state = '';
@@ -183,6 +231,147 @@ function hidePromotion() {
   promotionEl.hidden = true;
 }
 
+function rememberDevice() {
+  if (phase === 'setup') return;
+  try {
+    rememberDeviceRecovery(localStorage, {
+      phase,
+      startFen,
+      sans: chess.history(),
+      player,
+      manualResult,
+      clientGameId,
+      record: pending && pending.record,
+      discardedIds,
+      savedStatus: pending && pending.status,
+      accountId: accountState.id,
+      ownerAtStart,
+      prefs: { elo: prefs.elo, palette: prefs.palette, pieceStyle: prefs.pieceStyle, pieceColor: prefs.pieceColor }
+    });
+  } catch (err) { /* the browser blocked storage */ }
+}
+
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )chess_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function gamePayload(record) {
+  return {
+    clientGameId: record.id,
+    expectedProfileId: record.boundAccountId,
+    pgn: record.pgn,
+    startFen: record.startFen,
+    moves: record.moves,
+    result: record.result,
+    termination: record.termination,
+    playerColor: record.playerColor,
+    opponentName: record.opponentName,
+    opponentUciElo: record.opponentUciElo,
+    rated: false,
+    pieceStyle: record.pieceStyle,
+    pieceColor: record.pieceColor,
+    palette: record.palette
+  };
+}
+
+function samePending(operation) {
+  return !!(pending && pending.record && pending.record.id === operation.clientGameId && pending.record.boundAccountId === operation.record.boundAccountId);
+}
+
+let saveChain = Promise.resolve();
+async function tryAccountSave(kind) {
+  if (!pending || !pending.record) return;
+  const operation = {
+    kind,
+    clientGameId: pending.record.id,
+    record: pending.record,
+    accountId: accountState.id,
+    ownerAtStart: pending.record.boundAccountId || ownerAtStart
+  };
+  const run = saveChain.then(() => performAccountSave(operation));
+  saveChain = run.catch(() => {});
+  return run;
+}
+
+async function performAccountSave(operation) {
+  if (!operation.record || discardedIds.includes(operation.clientGameId)) return;
+  if (operation.accountId && accountState.id && operation.accountId !== accountState.id) {
+    if (pending && pending.record && pending.record.id === operation.clientGameId) {
+      pending.status = 'unsaved';
+      pending.error = 'This game was started for a different Chess account, so it was not saved there.';
+      rememberDevice();
+      render();
+    }
+    return;
+  }
+  const before = operation.record.pgn;
+  try {
+    const sessionResponse = await fetch('/api/session', { credentials: 'same-origin' });
+    if (!sessionResponse.ok) throw new Error('unavailable');
+    const session = await sessionResponse.json();
+    if (!session.profile) {
+      if (samePending(operation)) {
+        pending.status = 'unsaved';
+        pending.error = 'Join Chess before saving a game to an account. The copy on this device is not an account save.';
+        rememberDevice();
+        render();
+      }
+      return;
+    }
+    const headers = { 'content-type': 'application/json', 'x-csrf-token': csrfToken() };
+    if (discardedIds.includes(operation.clientGameId)) return;
+    if (operation.kind === 'auto') {
+      const settingsResponse = await fetch('/api/settings', { method: 'POST', credentials: 'same-origin', headers, body: '{}' });
+      if (!settingsResponse.ok) throw new Error('settings');
+      const settings = await settingsResponse.json();
+      if (settings.autoSaveBotResults !== true) {
+        if (samePending(operation)) {
+          pending.status = 'unsaved';
+          pending.error = 'Automatic saving is off for this Chess account. This game is not saved.';
+          rememberDevice();
+          render();
+        }
+        return;
+      }
+    }
+    if (discardedIds.includes(operation.clientGameId)) return;
+    if (session.profile.id !== operation.record.boundAccountId) {
+      if (samePending(operation)) {
+        pending.status = 'unsaved';
+        pending.error = 'This game belongs to a different Chess account.';
+        rememberDevice();
+        render();
+      }
+      return;
+    }
+    const response = await fetch('/api/games', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers,
+      body: JSON.stringify(gamePayload(operation.record))
+    });
+    const body = await response.json();
+    if (!samePending(operation) || pending.record.pgn !== before) return;
+    if (response.ok && body.status === 'saved') {
+      pending.status = 'saved';
+      pending.accountId = operation.accountId;
+      pending.error = '';
+    } else {
+      pending.status = 'unsaved';
+      pending.error = body.error || 'The account did not save this game. It is still unsaved.';
+    }
+  } catch (err) {
+    const decision = applySave(operation.kind, currentAccount(), loadAutoSavePreference(currentAccount()), operation.record, book);
+    if (pending && pending.record && pending.record.id === operation.clientGameId) {
+      pending.status = 'unsaved';
+      pending.error = decision.error;
+    }
+  }
+  rememberDevice();
+  render();
+}
+
 function enterEnded() {
   if (phase === 'ended') return;
   phase = 'ended';
@@ -193,36 +382,34 @@ function enterEnded() {
   let record = null;
   let error = '';
   try {
+    const settings = gameSettings || { elo: prefs.elo, palette: prefs.palette, pieceStyle: prefs.pieceStyle, pieceColor: prefs.pieceColor };
     record = buildGameRecord({
-      id: crypto.randomUUID(),
+      id: clientGameId,
+      boundAccountId: ownerAtStart,
       startFen,
       sans: chess.history(),
       result: resultCode(state),
-      termination: manualResult ? 'resign' : state.kind,
+      termination: manualResult ? 'resign' : (state.over ? state.kind : 'resign'),
       playerColor: player === 'w' ? 'white' : 'black',
       opponentName: 'Stockfish 19 Lite',
-      opponentUciElo: prefs.elo,
+      opponentUciElo: settings.elo,
+      pieceStyle: settings.pieceStyle,
+      pieceColor: settings.pieceColor,
+      palette: settings.palette,
       white: who.white,
       black: who.black,
       event: 'Bot chess',
       site: SITE,
-      date: today(),
-      boundAccountId: currentAccount().id
+      date: today()
     });
   } catch (err) {
     error = 'The full game record could not be built, so it was not saved.';
   }
   pending = { record, status: 'unsaved', error, accountId: null };
-  if (record) {
-    const account = currentAccount();
-    const decision = applySave('auto', account, loadAutoSavePreference(account), record, book);
-    pending.status = decision.status;
-    pending.error = decision.error || error;
-    pending.accountId = decision.accountId;
-    pending.record = decision.record;
-  }
   notice = '';
+  rememberDevice();
   render();
+  if (record) void tryAccountSave('auto');
 }
 
 function finishHumanMove(played) {
@@ -231,6 +418,7 @@ function finishHumanMove(played) {
   hidePromotion();
   notice = '';
   render();
+  rememberDevice();
   if (phase === 'playing') requestBot();
 }
 
@@ -303,6 +491,20 @@ function returnToSetup() {
   chess = freshChess();
   startFen = chess.fen();
   placeBoard(false);
+  try {
+    rememberDeviceRecovery(localStorage, {
+      phase: 'setup',
+      startFen,
+      sans: [],
+      player,
+      clientGameId: null,
+      discardedIds,
+      savedStatus: 'unsaved',
+      accountId: null,
+      ownerAtStart: null,
+      prefs
+    });
+  } catch (err) { /* the browser blocked storage */ }
   render();
   const start = document.getElementById('start-game');
   if (start) start.focus();
@@ -310,7 +512,7 @@ function returnToSetup() {
 
 function startGame() {
   if (unsavedFinished()) {
-    notice = 'This finished game is still unsaved. Discard it, or keep it open, before starting another. Account saving is not available.';
+    notice = 'This finished game is still unsaved. Save it or discard it before starting another.';
     render();
     return;
   }
@@ -325,7 +527,11 @@ function startGame() {
   notice = '';
   chess = freshChess();
   startFen = chess.fen();
+  clientGameId = crypto.randomUUID();
+  ownerAtStart = accountState.id;
+  gameSettings = { elo: prefs.elo, palette: prefs.palette, pieceStyle: prefs.pieceStyle, pieceColor: prefs.pieceColor };
   phase = 'playing';
+  rememberDevice();
   placeBoard(true);
   if (engineReady) engine.setElo(prefs.elo);
   windowEl.hidden = false;
@@ -336,7 +542,7 @@ function startGame() {
 
 function askLeave(action) {
   if (unsavedFinished()) {
-    notice = 'This finished game is still unsaved. Save is not available yet. Discard it or download the PGN before leaving. Leaving is blocked so the moves are not dropped.';
+    notice = 'This finished game is still unsaved. Save it to the Chess account or discard it before leaving. Leaving is blocked so the moves are not dropped.';
     render();
     return;
   }
@@ -384,6 +590,7 @@ engine.on((type, detail) => {
   lastMove = { from: played.from, to: played.to };
   selected = null;
   render();
+  rememberDevice();
 });
 
 document.getElementById('play-white').addEventListener('click', () => {
@@ -455,20 +662,25 @@ document.getElementById('resign').addEventListener('click', () => {
 });
 document.getElementById('save-account').addEventListener('click', () => {
   if (!pending || !pending.record) return;
-  const account = currentAccount();
-  const before = pending.record.pgn;
-  const decision = applySave('manual', account, loadAutoSavePreference(account), pending.record, book);
-  pending.status = decision.status;
-  pending.error = decision.error;
-  pending.accountId = decision.accountId;
-  pending.record = decision.record;
-  if (pending.record.pgn !== before) pending.error = 'The game record changed during the save attempt, so it was not treated as saved.';
-  notice = '';
-  render();
+  void tryAccountSave('manual');
 });
 document.getElementById('discard-result').addEventListener('click', () => {
-  if (pending && pending.record) book.noteDiscard(pending.record.id);
-  notice = 'The unsaved game was discarded. Games already stored in an account are not deleted. None are stored yet.';
+  if (pending && pending.record) {
+    book.noteDiscard(pending.record.id);
+    discardedIds.push(pending.record.id);
+    try {
+      rememberDeviceRecovery(localStorage, {
+        phase: 'setup',
+        startFen,
+        sans: [],
+        player,
+        clientGameId: pending.record.id,
+        record: null,
+        discardedIds
+      });
+    } catch (err) { /* the browser blocked storage */ }
+  }
+  notice = 'The unsaved game was discarded. Games already stored in an account are not deleted.';
   returnToSetup();
 });
 document.getElementById('download-pgn').addEventListener('click', () => {
@@ -486,7 +698,6 @@ promotionEl.addEventListener('click', (event) => {
   const choice = pendingPromotion;
   tryMove(choice.from, choice.to, button.getAttribute('data-piece'));
 });
-autoBox.addEventListener('change', syncAccountSettings);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && pendingPromotion) {
     hidePromotion();
@@ -514,6 +725,154 @@ document.addEventListener('keydown', (event) => {
 chess = freshChess();
 startFen = chess.fen();
 placeBoard(false);
+const recovered = readDeviceRecovery(localStorage);
+if (recovered && recovered.phase !== 'setup') {
+  try {
+    discardedIds = recovered.discardedIds || [];
+    clientGameId = recovered.clientGameId || clientGameId;
+    ownerAtStart = recovered.ownerAtStart || null;
+    if (recovered.prefs) {
+      prefs = Object.assign({}, prefs, recovered.prefs);
+      gameSettings = recovered.prefs;
+    }
+    player = recovered.player || player;
+    chess = new Chess();
+    if (recovered.startFen) chess.load(recovered.startFen);
+    recovered.sans.forEach((san) => chess.move(san));
+    startFen = recovered.startFen || startFen;
+    manualResult = recovered.manualResult;
+    if (recovered.phase === 'playing' && !outcome(chess).over && !manualResult) {
+      phase = 'playing';
+      placeBoard(true);
+    } else if (recovered.record) {
+      phase = 'ended';
+      pending = {
+        record: recovered.record,
+        status: recovered.savedStatus === 'saved' && recovered.accountId ? 'saved' : 'unsaved',
+        error: recovered.savedStatus === 'saved' ? '' : recovered.note,
+        accountId: recovered.accountId || null
+      };
+      placeBoard(true);
+    }
+  } catch (err) {
+    chess = freshChess();
+    phase = 'setup';
+    placeBoard(false);
+  }
+}
 syncAccountSettings();
 render();
+let replayGame = null;
+let replayIndex = 0;
+let replayStart = '';
+const replayBoard = mountBoard(document.getElementById('replay-board'), () => {});
+function openReplay(game) {
+  if (phase === 'playing' || (phase === 'ended' && pending && pending.status !== 'saved')) {
+    const note = document.getElementById('saved-games-note');
+    if (note) note.textContent = 'Finish or discard the game on the board before replaying a saved game.';
+    return;
+  }
+  replayGame = new Chess();
+  replayGame.loadPgn(game.pgn);
+  replayStart = game.startFen;
+  replayIndex = replayGame.history().length;
+  document.getElementById('replay-panel').hidden = false;
+  showReplay();
+}
+function showReplay() {
+  const cursor = new Chess(replayStart || undefined);
+  const moves = replayGame.history();
+  moves.slice(0, replayIndex).forEach((san) => cursor.move(san));
+  replayBoard.render({
+    orientation: 'w',
+    pieces: pieceMap(cursor),
+    selected: null,
+    legal: [],
+    palette: 'midnight',
+    pieceStyle: 'standard',
+    pieceColor: 'ink',
+    pieceColors: pieceColors('ink'),
+    checkSquare: null,
+    lastMove: null,
+    interactive: false
+  });
+  document.getElementById('replay-status').textContent = replayIndex === 0
+    ? 'Starting position.'
+    : 'Move ' + replayIndex + ': ' + moves[replayIndex - 1];
+}
+document.getElementById('replay-prev').addEventListener('click', () => {
+  replayIndex = Math.max(0, replayIndex - 1);
+  showReplay();
+});
+document.getElementById('replay-next').addEventListener('click', () => {
+  replayIndex = Math.min(replayGame ? replayGame.history().length : 0, replayIndex + 1);
+  showReplay();
+});
+document.getElementById('replay-close').addEventListener('click', () => {
+  document.getElementById('replay-panel').hidden = true;
+  replayGame = null;
+  replayIndex = 0;
+});
+
+async function loadSavedGames(cursor) {
+  const list = document.getElementById('saved-games-list');
+  const note = document.getElementById('saved-games-note');
+  if (!list || !note) return;
+  if (!cursor) list.replaceChildren();
+  if (!accountState.id) {
+    note.textContent = 'Saved games appear here after you join Chess and save a finished game.';
+    return;
+  }
+  const response = await fetch('/api/games/list', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken() },
+    body: JSON.stringify({ before: cursor && cursor.createdAt, beforeId: cursor && cursor.id, limit: 20 })
+  });
+  if (!response.ok) return;
+  const body = await response.json();
+  const games = body.games || [];
+  if (!cursor) note.textContent = games.length ? 'These games are stored on your Chess account.' : 'No games are saved on this Chess account yet.';
+  const previous = list.querySelector('[data-more]');
+  if (previous) previous.remove();
+  games.forEach((game) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool';
+    button.textContent = 'Replay ' + game.result;
+    button.addEventListener('click', () => openReplay(game));
+    item.append(button);
+    list.append(item);
+  });
+  if (games.length === 20) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'tool';
+    more.dataset.more = 'true';
+    more.textContent = 'More saved games';
+    const last = games[games.length - 1];
+    more.addEventListener('click', () => loadSavedGames({ createdAt: last.createdAt, id: last.id }));
+    list.append(more);
+  }
+}
+
+void refreshAccount();
 engine.start();
+autoBox.addEventListener('change', () => {
+  if (!accountState.id) {
+    syncAccountSettings();
+    return;
+  }
+  const enabled = autoBox.checked === true;
+  autoNote.textContent = enabled ? 'Saving automatic saving on this Chess account…' : 'Turning automatic saving off…';
+  void fetch('/api/settings', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken() },
+    body: JSON.stringify({ autoSaveBotResults: enabled })
+  }).then((response) => response.json()).then((body) => {
+    if (body && body.autoSaveBotResults === enabled) accountState.autoSave = enabled;
+    syncAccountSettings();
+  }).catch(() => syncAccountSettings());
+});

@@ -9,7 +9,9 @@ import {
   buildGameRecord,
   createResultBook,
   loadAutoSavePreference,
+  readDeviceRecovery,
   recordReplayErrors,
+  rememberDeviceRecovery,
   replayRecord
 } from './bot-results.js';
 
@@ -96,7 +98,7 @@ const unavailable = applySave('manual', owner, preference, castle, pageBook);
 assert.equal(unavailable.outcome, 'unavailable');
 assert.equal(unavailable.status, 'unsaved');
 assert.equal(unavailable.record, castle);
-assert.match(unavailable.error, /not available/);
+assert.match(unavailable.error, /still unsaved/);
 assert.equal(pageBook.posts.length, 0);
 assert.equal(ACCOUNT_SAVE_UNAVAILABLE.includes('not an account save'), true);
 assert.equal(source.includes("outcome: 'saved'"), false);
@@ -138,5 +140,25 @@ assert.equal(offline.record.moves[0].uci, 'a7a8q');
 const game = new Chess();
 game.move('e4');
 assert.equal(game.history().length, 1);
+
+const device = rememberDeviceRecovery({ setItem(_key, value) { this.value = value; }, value: null }, {
+  phase: 'ended',
+  startFen: castle.startFen,
+  sans: castle.moves.map((move) => move.san),
+  player: 'w',
+  clientGameId: castle.id,
+  record: castle,
+  discardedIds: [],
+  savedStatus: 'saved',
+  accountId: 'profile-a',
+  ownerAtStart: 'profile-a',
+  prefs: { elo: 1600 }
+});
+assert.equal(device.accountSave, false);
+assert.equal(device.savedStatus, 'saved');
+assert.equal(device.accountId, 'profile-a');
+assert.equal(device.ownerAtStart, 'profile-a');
+assert.match(device.note, /Not an account save/);
+assert.equal(device.record.pgn, castle.pgn);
 
 console.log('bot result record tests passed');

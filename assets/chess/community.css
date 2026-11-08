@@ -1,0 +1,27 @@
+.community{margin-top:8px}
+.community-field{display:flex;flex-direction:column;gap:4px;margin-top:12px;color:#e8e8e8}
+.community-field input,.community-field textarea{
+  width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:12px;
+  border:1px solid var(--line);background:#000;color:#fff;font:inherit;
+}
+.community-field textarea{min-height:6rem;resize:vertical}
+.community-note{color:var(--mute);font-size:14px;line-height:1.5}
+.community-status{color:#e8e8e8}
+.community-error{color:#fff;border:1px solid var(--sky);border-radius:12px;padding:10px 12px}
+.community-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.community-post,.community-reply{
+  margin-top:16px;padding:12px 0 0;border-top:1px solid var(--line);
+}
+.community-post h3,.community-reply h4{
+  margin:0;color:var(--sky);font-size:16px;font-family:Inter,system-ui,sans-serif;
+}
+.community-time{margin:4px 0 0;color:var(--mute);font-size:12px}
+.community-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
+.tool{
+  appearance:none;min-height:44px;padding:0 12px;border-radius:12px;
+  border:1px solid var(--sky);background:#000;color:var(--sky);font:inherit;font-weight:600;cursor:pointer;
+}
+.tool:disabled{opacity:.6;cursor:default}
+.tool:focus-visible,.community-field input:focus-visible,.community-field textarea:focus-visible{
+  outline:2px solid var(--sky);outline-offset:3px;
+}

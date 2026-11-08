@@ -16,14 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
-<style>
-.signin-field{display:grid;gap:6px;max-width:28rem;margin:16px 0}
-.signin-field input{font:inherit;padding:8px 10px;border:1px solid #345;background:#000;color:inherit}
-.signin-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 16px}
-.signin-actions button,.signin-note{font:inherit}
-.signin-actions button{padding:8px 12px;border:1px solid #4fc3ff;background:transparent;color:inherit;cursor:pointer}
-.signin-status{margin:12px 0}
-</style>
+<link rel="stylesheet" href="/assets/chess/community.css">
 
 </head>
 <body class="sheet">
@@ -45,22 +38,11 @@
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Community</span></li></ol></nav>
 <main class="page" id="main">
-  <p class="eyebrow">Session check</p>
-  <h1>Sign in</h1>
-  <div class="prose">
-    <p>Use your email to check the Chess session on this site. This page does not join Chess, publish a post, or save a game.</p>
-    <form id="signin-form">
-      <label class="signin-field">Email
-        <input id="signin-email" type="email" autocomplete="email" required maxlength="320">
-      </label>
-      <div class="signin-actions">
-        <button type="submit">Email me a sign-in link</button>
-        <button type="button" id="signout" hidden>Sign out</button>
-      </div>
-    </form>
-    <p id="signin-status" class="signin-status" role="status">Checking the session.</p>
-    <p class="signin-note">The email link returns to this page. Joining, saving, and replay stay off until a later acceptance step.</p>
-  </div>
+  <p class="eyebrow">Shared posts</p>
+  <h1>Community</h1>
+  <p class="lead">A small place for signed-in display names, posts, and replies.</p>
+  <noscript><p>Community sign-in needs JavaScript. No posts are shown.</p></noscript>
+  <div id="community-app"></div>
   <nav class="page-nav" aria-label="Related">
   <h2>Related</h2>
   <ul class="children">
@@ -93,6 +75,6 @@
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <script src="/assets/site.js"></script>
-<script type="module" src="/assets/chess/auth-accept.js"></script>
+<script type="module" src="/assets/chess/community-app.js"></script>
 </body>
 </html>
