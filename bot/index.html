@@ -41,7 +41,7 @@
   <p class="eyebrow">Playable</p>
   <h1>Bot chess</h1>
   <p class="lead">Play a standard game against a bot on this site.</p>
-  <div class="prose"><p>Legal moves are enforced, including check, castling, en passant, and promotion. The bot runs in a separate worker. Search time is a limit, not a rating.</p></div>
+  <div class="prose"><p>Legal moves are enforced, including check, castling, en passant, and promotion. The bot is Stockfish 19 Lite in a worker. Its strength control is UCI_Elo from 1320 to 3190. Those values are the engine's limits, not a measured rating. This build does not accept a target below 1320.</p></div>
   <div class="play">
     <div class="play-toolbar">
       <fieldset>
@@ -49,11 +49,17 @@
         <button type="button" class="tool" id="play-white" aria-pressed="true">White</button>
         <button type="button" class="tool" id="play-black" aria-pressed="false">Black</button>
       </fieldset>
-      <fieldset>
-        <legend>Bot search</legend>
-        <button type="button" class="tool" data-ms="200" aria-pressed="false">Up to 0.2s</button>
-        <button type="button" class="tool" data-ms="500" aria-pressed="true">Up to 0.5s</button>
-        <button type="button" class="tool" data-ms="1200" aria-pressed="false">Up to 1.2s</button>
+      <fieldset id="elo-choices">
+        <legend>Bot limit</legend>
+      </fieldset>
+      <fieldset id="palette-choices">
+        <legend>Board</legend>
+      </fieldset>
+      <fieldset id="piece-style-choices">
+        <legend>Piece style</legend>
+      </fieldset>
+      <fieldset id="piece-color-choices">
+        <legend>Piece color</legend>
       </fieldset>
       <button type="button" class="tool" id="new-game">New game</button>
       <button type="button" class="tool" id="resign">Resign</button>

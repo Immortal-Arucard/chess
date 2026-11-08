@@ -3,10 +3,12 @@ import { pieceName } from './rules.js';
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
-function pieceSvg(type, color) {
-  const fill = color === 'w' ? '#ffffff' : '#000000';
-  const stroke = color === 'w' ? '#000000' : '#4fc3ff';
-  const common = `fill="${fill}" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"`;
+function pieceSvg(type, color, style, colors) {
+  const fill = color === 'w' ? colors.lightFill : colors.darkFill;
+  const stroke = color === 'w' ? colors.lightStroke : colors.darkStroke;
+  const width = style === 'solid' ? '1.2' : '2.4';
+  const paint = style === 'outline' ? 'none' : fill;
+  const common = `fill="${paint}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round"`;
   const shapes = {
     p: `<circle cx="20" cy="14" r="5" ${common}/><path d="M12 30h16l-2-8H14z" ${common}/>`,
     r: `<path d="M11 12h4v3h3v-3h4v3h3v-3h4v6H11zm0 6h18v12H11z" ${common}/>`,
@@ -49,6 +51,9 @@ export function mountBoard(root, onSquare) {
     if (!squares.includes(focus)) focus = squares[0];
     root.replaceChildren();
     root.className = 'board';
+    root.dataset.palette = state.palette || 'midnight';
+    root.dataset.pieceStyle = state.pieceStyle || 'line';
+    root.dataset.pieceColor = state.pieceColor || 'ink';
     root.setAttribute('role', 'grid');
     root.setAttribute('aria-label', 'Chessboard');
     root.setAttribute('aria-disabled', state.interactive ? 'false' : 'true');
@@ -80,7 +85,8 @@ export function mountBoard(root, onSquare) {
         if (state.legal.includes(square)) label += piece ? ', legal capture' : ', legal move';
         if (state.checkSquare === square) label += ', in check';
         button.setAttribute('aria-label', label);
-        if (piece) button.innerHTML = pieceSvg(piece.type, piece.color);
+        const colors = state.pieceColors || { lightFill: '#ffffff', lightStroke: '#111111', darkFill: '#111111', darkStroke: '#4fc3ff' };
+        if (piece) button.innerHTML = pieceSvg(piece.type, piece.color, state.pieceStyle || 'line', colors);
         button.addEventListener('click', () => {
           focus = square;
           if (state.interactive) onSquare(square);
