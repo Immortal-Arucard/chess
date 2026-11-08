@@ -17,6 +17,8 @@
 }
 .community-time{margin:4px 0 0;color:var(--mute);font-size:12px}
 .community-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
+.discussion-line{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
+.discussion-log{margin-top:12px}
 .tool{
   appearance:none;min-height:44px;padding:0 12px;border-radius:12px;
   border:1px solid var(--sky);background:#000;color:var(--sky);font:inherit;font-weight:600;cursor:pointer;

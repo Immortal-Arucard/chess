@@ -1,11 +1,15 @@
-import { profileRoute } from './community-model.js';
+import { communityRoute } from './community-model.js';
 import { createChessGateway } from './community-gateway.js';
-import { mountCommunity, mountProfile } from './community-view.js';
+import { mountCommunity, mountDiscussion, mountProfile } from './community-view.js';
 
 const root = document.getElementById('community-app');
-const route = profileRoute(window.location);
+const route = communityRoute(window.location);
 
 function show(configured, gateway) {
+  if (route.page === 'discussion') {
+    mountDiscussion(root, { configured, gateway });
+    return;
+  }
   if (route.page === 'profile') {
     mountProfile(root, {
       configured,

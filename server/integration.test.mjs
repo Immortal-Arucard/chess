@@ -25,6 +25,7 @@ function psql(database, sql) {
   const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1'], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1'], process.env];
   const result = spawnSync(command[0], command[1], { input: sql, encoding: 'utf8', env: command[2] });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return result.stdout;
 }
 
 function setup() {
@@ -40,6 +41,7 @@ function setup() {
     create extension if not exists pgcrypto schema extensions;
   `);
   psqlFile(db, 'supabase/chess_release.sql');
+  psqlFile(db, 'supabase/chess_discussion.sql');
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;
@@ -320,11 +322,77 @@ const ada = cookieJar();
 const bob = cookieJar();
 await signIn(port, ada, adaMaster);
 await signIn(port, bob, bobMaster);
+const beforeJoin = await request(port, ada, 'POST', '/api/discussion', { body: 'too soon' }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(beforeJoin.status, 400);
+assert.equal(beforeJoin.json.error, 'Join Chess before doing that.');
 const adaJoin = await request(port, ada, 'POST', '/api/join', { displayName: 'Ada' }, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.equal(adaJoin.status, 200, adaJoin.text);
 assert.equal(JSON.stringify(adaJoin.json).includes(adaMaster), false);
 const bobJoin = await request(port, bob, 'POST', '/api/join', { displayName: 'Bob' }, { 'x-csrf-token': bob.get('chess_csrf') });
 assert.equal(bobJoin.status, 200, bobJoin.text);
+const signedOutDiscussion = await request(port, cookieJar(), 'POST', '/api/discussion', { body: 'nope' });
+assert.equal(signedOutDiscussion.status, 401);
+const adaLine = await request(port, ada, 'POST', '/api/discussion', { body: 'Ada in the room <b>safe</b>', authorId: adaJoin.json.id }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(adaLine.status, 200, adaLine.text);
+assert.equal(adaLine.json.authorId, adaJoin.json.id);
+assert.equal(adaLine.json.body, 'Ada in the room <b>safe</b>');
+assert.equal(JSON.stringify(adaLine.json).includes(adaMaster), false);
+const bobLine = await request(port, bob, 'POST', '/api/discussion', { body: 'Bob in the same room', authorId: bobJoin.json.id }, { 'x-csrf-token': bob.get('chess_csrf') });
+assert.equal(bobLine.status, 200, bobLine.text);
+const room = await request(port, cookieJar(), 'GET', '/api/discussion?limit=20');
+assert.equal(room.json.messages.map((item) => item.body).join('|'), 'Ada in the room <b>safe</b>|Bob in the same room');
+assert.equal(JSON.stringify(room.json).includes(adaMaster), false);
+assert.equal(JSON.stringify(room.json).includes(bobMaster), false);
+const older = await request(port, cookieJar(), 'GET', '/api/discussion?limit=1');
+assert.equal(older.json.messages.length, 1);
+assert.equal(older.json.messages[0].body, 'Bob in the same room');
+const earlier = await request(port, cookieJar(), 'GET', '/api/discussion?limit=1&before=' + encodeURIComponent(older.json.messages[0].createdAt) + '&beforeId=' + older.json.messages[0].id);
+assert.equal(earlier.json.messages.length, 1);
+assert.equal(earlier.json.messages[0].body, 'Ada in the room <b>safe</b>');
+assert.notEqual(earlier.json.messages[0].id, older.json.messages[0].id);
+const newer = await request(port, cookieJar(), 'GET', '/api/discussion?limit=20&after=' + encodeURIComponent(adaLine.json.createdAt) + '&afterId=' + adaLine.json.id);
+assert.equal(newer.json.messages.length, 1);
+assert.equal(newer.json.messages[0].id, bobLine.json.id);
+const profilePage = await request(port, cookieJar(), 'GET', '/api/profiles/' + adaJoin.json.id);
+assert.equal(profilePage.json.displayName, 'Ada');
+assert.equal(JSON.stringify(profilePage.json).includes(adaMaster), false);
+const forced = psql(db, "select relrowsecurity::text || ',' || relforcerowsecurity::text from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = 'chess_discussion_messages';");
+assert.match(forced, /true,true/);
+const asBob = await request(port, ada, 'POST', '/api/discussion', { body: 'sent as the wrong profile', authorId: bobJoin.json.id }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(asBob.status, 400);
+assert.equal(asBob.json.error, 'You can discuss only as your own Chess profile.');
+const asAda = await request(port, bob, 'POST', '/api/discussion', { body: 'bob wearing ada', authorId: adaJoin.json.id }, { 'x-csrf-token': bob.get('chess_csrf') });
+assert.equal(asAda.status, 400);
+assert.equal(asAda.json.error, 'You can discuss only as your own Chess profile.');
+const missingAuthor = await request(port, ada, 'POST', '/api/discussion', { body: 'no author' }, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.equal(missingAuthor.status, 400);
+assert.equal(missingAuthor.json.error, 'You can discuss only as your own Chess profile.');
+const rejectedBodies = psql(db, "select count(*)::text from public.chess_discussion_messages where body in ('sent as the wrong profile', 'bob wearing ada', 'no author');");
+assert.match(rejectedBodies, /\b0\b/);
+psql(db, `
+  insert into public.chess_discussion_messages (id, author_id, body, created_at)
+  select ('aaaaaaaa-aaaa-4aaa-8aaa-' || lpad(to_hex(n), 12, '0'))::uuid,
+    '${adaJoin.json.id}'::uuid,
+    'tie-' || n::text,
+    timestamptz '2099-01-01 00:00:00+00'
+  from generate_series(1, 30) as n;
+`);
+const tieStamp = '2099-01-01T00:00:00Z';
+const tieId = (n) => 'aaaaaaaa-aaaa-4aaa-8aaa-' + n.toString(16).padStart(12, '0');
+const tieOne = await request(port, cookieJar(), 'GET', '/api/discussion?limit=1&after=' + encodeURIComponent(tieStamp) + '&afterId=' + tieId(1));
+assert.equal(tieOne.json.messages.length, 1);
+assert.equal(tieOne.json.messages[0].id, tieId(2));
+assert.equal(tieOne.json.messages[0].body, 'tie-2');
+const tiePage = await request(port, cookieJar(), 'GET', '/api/discussion?limit=20&after=' + encodeURIComponent(tieStamp) + '&afterId=' + tieId(1));
+assert.equal(tiePage.json.messages.length, 20);
+assert.equal(tiePage.json.messages[0].body, 'tie-2');
+assert.equal(tiePage.json.messages[19].body, 'tie-21');
+const tieRest = await request(port, cookieJar(), 'GET', '/api/discussion?limit=20&after=' + encodeURIComponent(tiePage.json.messages[19].createdAt) + '&afterId=' + tiePage.json.messages[19].id);
+assert.deepEqual(tieRest.json.messages.map((item) => item.body), ['tie-22', 'tie-23', 'tie-24', 'tie-25', 'tie-26', 'tie-27', 'tie-28', 'tie-29', 'tie-30']);
+const tieIds = new Set([...tiePage.json.messages, ...tieRest.json.messages].map((item) => item.id));
+assert.equal(tieIds.size, 29);
+assert.equal(tieIds.has(tieId(1)), false);
+assert.equal(tieIds.has(tieId(10)), true);
 const renamed = await request(port, ada, 'POST', '/api/profile/rename', { displayName: 'Ada Lovelace' }, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.equal(renamed.status, 200, renamed.text);
 assert.equal(renamed.json.displayName, 'Ada Lovelace');

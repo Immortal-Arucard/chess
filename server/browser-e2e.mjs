@@ -61,6 +61,7 @@ psql(db, `
   create extension if not exists pgcrypto schema extensions;
 `);
 psqlFile(db, 'supabase/chess_release.sql');
+psqlFile(db, 'supabase/chess_discussion.sql');
 psql(db, `alter role chess_server login password '${password}'; grant connect on database ${db} to chess_server;`);
 
 const challenges = new Map();
@@ -133,24 +134,24 @@ const logs = [];
 page.on('pageerror', (err) => logs.push('pageerror ' + err.message));
 page.on('console', (msg) => { if (msg.type() === 'error') logs.push('console ' + msg.text()); });
 
-async function signIn(email, name, masterId) {
-  await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('input[type=email]');
-  await page.type('input[type=email]', email);
-  await page.type('input[autocomplete=nickname]', name);
-  await page.click('button[type=submit]');
-  await page.waitForFunction(() => document.body.innerText.includes('Check '));
+async function signIn(email, name, masterId, target = page) {
+  await target.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
+  await target.waitForSelector('input[type=email]');
+  await target.type('input[type=email]', email);
+  await target.type('input[autocomplete=nickname]', name);
+  await target.click('button[type=submit]');
+  await target.waitForFunction(() => document.body.innerText.includes('Check '));
   const row = [...challenges.values()].find((item) => item.email === email && !item.code);
   const code = randomToken();
   row.code = code;
   row.masterId = masterId;
-  await page.goto(origin + '/api/auth/callback?code=' + encodeURIComponent(code), { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#community-app input[type=text]');
-  const box = await page.$('#community-app input[type=text]');
+  await target.goto(origin + '/api/auth/callback?code=' + encodeURIComponent(code), { waitUntil: 'domcontentloaded' });
+  await target.waitForSelector('#community-app input[type=text]');
+  const box = await target.$('#community-app input[type=text]');
   await box.click({ clickCount: 3 });
   await box.type(name);
-  await page.click('button[type=submit]');
-  await page.waitForFunction((expected) => document.body.innerText.includes('Signed in as ' + expected), {}, name);
+  await target.click('button[type=submit]');
+  await target.waitForFunction((expected) => document.body.innerText.includes('Signed in as ' + expected), {}, name);
 }
 
 let intercept = false;
@@ -193,6 +194,36 @@ async function playE4() {
 
 try {
   await signIn('ada@example.test', 'Ada Lovelace', adaMaster);
+  await page.setViewport({ width: 390, height: 844 });
+  await page.goto(origin + '/community/discussion/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#discussion-body');
+  await page.type('#discussion-body', 'Ada says hello <b>safe</b>');
+  await page.click('#discussion-send');
+  await page.waitForFunction(() => document.getElementById('discussion-log').innerText.includes('Ada says hello <b>safe</b>'));
+  const markup = await page.$eval('#discussion-log', (el) => el.innerHTML);
+  if (markup.includes('<b>')) throw new Error('the discussion parsed a message as HTML');
+  const bobContext = await browser.createBrowserContext();
+  const bobPage = await bobContext.newPage();
+  bobPage.on('pageerror', (err) => logs.push('pageerror ' + err.message));
+  await bobPage.setViewport({ width: 390, height: 844 });
+  await signIn('bob@example.test', 'Bob Stone', bobMaster, bobPage);
+  await bobPage.goto(origin + '/community/discussion/', { waitUntil: 'domcontentloaded' });
+  await bobPage.waitForFunction(() => document.body.innerText.includes('Ada says hello <b>safe</b>'));
+  await bobPage.click('#discussion-log a');
+  await bobPage.waitForFunction(() => location.pathname.indexOf('/community/profile') === 0);
+  await bobPage.reload({ waitUntil: 'domcontentloaded' });
+  await bobPage.waitForFunction(() => document.body.innerText.includes('Ada Lovelace') && document.body.innerText.includes('Chess community profile'));
+  await bobPage.goBack();
+  await bobPage.waitForFunction(() => location.pathname.indexOf('/community/discussion') === 0);
+  await bobPage.waitForSelector('#discussion-body');
+  await bobPage.setOfflineMode(true);
+  await bobPage.type('#discussion-body', 'offline bob');
+  await bobPage.click('#discussion-send');
+  await bobPage.waitForFunction(() => document.body.innerText.includes('not stored on this device'));
+  const deviceCopy = await bobPage.evaluate(() => JSON.stringify(window.localStorage));
+  if (deviceCopy.includes('offline bob')) throw new Error('an offline discussion message was stored on the device');
+  await bobPage.setOfflineMode(false);
+  await page.setViewport({ width: 1280, height: 800 });
   await page.goto(origin + '/bot/', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#elo-choices button');
   await page.evaluate(() => [...document.querySelectorAll('#elo-choices button')].find((button) => button.textContent === '2000').click());
