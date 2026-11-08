@@ -1,0 +1,21 @@
+Stockfish.js 19.0.1 lite single-threaded build
+
+The files in this directory are unmodified from the npm package stockfish@19.0.1
+(https://www.npmjs.com/package/stockfish, https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1).
+
+SHA-256
+ccb130d7ff29408531c47d859a49f91d59d4f482d05a53eb1a3231a4f624c91a  stockfish-19-lite-single.js  28230 bytes
+ee4f115bdb2d32cadf96cada104a05b5ec257d7ad6f57582190b49bc71f096de  stockfish-19-lite-single.wasm  1845971 bytes
+0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b  Copying.txt  35821 bytes
+
+Corresponding source, at no charge:
+https://github.com/nmrugg/stockfish.js/archive/refs/tags/v19.0.1.tar.gz
+https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.1
+
+That tag contains the Stockfish C++ sources under src/, the Emscripten glue, and build.js.
+Stockfish.js 19 tracks Stockfish 19: https://github.com/official-stockfish/Stockfish
+The lite network is nn-61e7af4bb97d by Chris Bao (sscg13):
+https://github.com/sscg13/Stockfish/tree/sf19-1mb
+
+This site does not modify the engine. Copying.txt is the GNU GPL version 3.
+The wrapper header in stockfish-19-lite-single.js identifies Stockfish.js 19, Chess.com, LLC, and the Stockfish authors.

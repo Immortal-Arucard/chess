@@ -1,4 +1,4 @@
-const CACHE = 'chess-v2';
+const CACHE = 'chess-v3';
 const ROUTES = [
   '/',
   '/theory/',
@@ -32,6 +32,17 @@ const ASSETS = [
   '/manifest.webmanifest',
   '/assets/site.css',
   '/assets/site.js',
+  '/assets/chess/rules.js',
+  '/assets/chess/engine.js',
+  '/assets/chess/board.js',
+  '/assets/chess/board.css',
+  '/bot/bot.js',
+  '/assets/vendor/chess.js/chess.js',
+  '/assets/vendor/chess.js/LICENSE',
+  '/assets/vendor/stockfish/stockfish-19-lite-single.js',
+  '/assets/vendor/stockfish/stockfish-19-lite-single.wasm',
+  '/assets/vendor/stockfish/Copying.txt',
+  '/assets/vendor/stockfish/SOURCE.txt',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
