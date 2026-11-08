@@ -154,7 +154,7 @@ function assertReleaseRollsBack() {
   if ((release.match(/\bbegin\s*;/gi) || []).length !== 1 || (release.match(/\bcommit\s*;/gi) || []).length !== 1 || release.includes('\\ir')) {
     throw new Error('chess_release.sql is not one plain SQL transaction');
   }
-  const broken = release.replace(/\bcommit\s*;\s*$/i, "do $$ begin raise exception 'intentional rollback'; end $$;\n");
+  const broken = release.replace(/\bcommit\s*;\s*$/i, () => "do $$ begin raise exception 'intentional rollback'; end $$;\n");
   let failed = false;
   try { psql(name, broken); } catch (err) { failed = true; }
   if (!failed) throw new Error('the broken migration committed');
