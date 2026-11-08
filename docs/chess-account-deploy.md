@@ -1,15 +1,15 @@
 # Chess account service deployment
 
-This service is not deployed. Production data was not changed. The live bot remains commit `20d38e8e746e4720e0f6c6a8e7d5d171c77d3661` until this branch is reviewed and merged.
+The Worker is not deployed. The reviewed migration `1925b2a8e191dea47b16f6a46cd0aa8caf47d3d9` in `supabase/chess_release.sql` has been applied and verified. Do not apply it again. The live bot remains commit `20d38e8e746e4720e0f6c6a8e7d5d171c77d3661` until this branch is reviewed and merged.
 
 ## What the parent runs
 
 1. In the existing Supabase project `xfswvbxuhgqbdqpqiywa`, open the SQL editor as the database owner and run `supabase/chess_release.sql` once. It is one transaction. Do not use the service-role key from Chess. `pgcrypto` must be in the `extensions` schema. `extensions.digest` is the function the migration calls.
 2. Give only `chess_server` a password: `alter role chess_server login password '...';` Grant it `connect` on that database only. Do not grant it `chess_api`, `supabase_admin`, the service role, or `chess_authority`. Leave `chess_authority` as `NOLOGIN`. Do not give it a password.
 3. Create a cache-disabled Hyperdrive configuration with the `chess_server` connection string only. Put its id in `wrangler.jsonc` in place of `REPLACE_WITH_CACHE_DISABLED_HYPERDRIVE_ID`. Hyperdrive is included on the Workers Free plan at 100,000 queries a day. Set Worker secrets `CHESS_ORIGIN=https://chess.theworldgovernmentincorporated.com`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`. Do not commit them. Deploy the Worker whose entry is `server/worker.mjs`, as named by `wrangler.jsonc`. `chess_authority` is not a Worker binding and not a Hyperdrive connection. There is no separate Node host.
-4. Leave the Compass Site URL as it is. Allow `https://chess.theworldgovernmentincorporated.com/api/auth/callback`. The email link lands there, the service completes the session, and it redirects to `/community/`.
+4. The Compass Site URL stays as it is. `https://chess.theworldgovernmentincorporated.com/api/auth/callback` is already allowed. The email link lands there, the service completes the session, and it redirects to `/community/`.
 5. Proxy the chess DNS name and attach the Worker to `/api/*` only. That DNS change is a parent action. This run does not change DNS. GitHub Pages keeps the static site. The service worker does not cache `/api/`.
-6. Do not expose `chess_private` in the Data API. Do not put a publishable key or service-role key in the Chess page.
+6. Keep both `chess_private` and `chess_service` out of the Data API exposed schemas. The verified exposure is `graphql_public` and `public` only. Leave that list unchanged. Do not put a publishable key or service-role key in the Chess page.
 
 ## Behavior the service implements
 
