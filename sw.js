@@ -44,7 +44,6 @@ const ASSETS = [
   '/assets/chess/community-view.js',
   '/assets/chess/community-supabase.js',
   '/assets/chess/community-app.js',
-  '/assets/vendor/supabase.js',
   '/bot/bot.js',
   '/assets/vendor/chess.js/chess.js',
   '/assets/vendor/chess.js/LICENSE',

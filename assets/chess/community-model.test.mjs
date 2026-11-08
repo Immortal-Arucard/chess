@@ -77,6 +77,16 @@ assert.equal(sql.includes('public.profiles'), false);
 assert.equal(sql.includes('public.results'), false);
 assert.doesNotMatch(sql, /table public\.test_events|from public\.test_events/);
 assert.equal(sql.includes('service_role'), true);
+assert.match(sql, /chess_api/);
+assert.match(sql, /chess_private\.sessions/);
+assert.match(sql, /chess_private\.rate_buckets/);
+assert.match(sql, /revoke all on table public\.chess_posts from public, anon, authenticated/);
+assert.doesNotMatch(sql, /grant execute on function chess_private\.provision_profile\(uuid, text\) to anon/);
+assert.doesNotMatch(sql, /grant execute on function chess_private\.provision_profile\(uuid, text\) to authenticated/);
+const appText = readFileSync(new URL('./community-app.js', import.meta.url), 'utf8');
+assert.equal(appText.includes('createClient'), false);
+assert.equal(appText.includes('supabase.js'), false);
+assert.equal(appText.includes('master sign-in library'), true);
 assert.doesNotMatch(sql, /eyJ[A-Za-z0-9_-]{20,}/);
 
 const users = {

@@ -78,7 +78,7 @@ export function mountCommunity(root, options) {
     if (!options.configured) {
       root.append(
         el('p', 'eyebrow', 'Not configured'),
-        el('p', null, 'Shared posts need the Chess database migration and a publishable key. No posts are shown, and nothing is stored on this device.')
+        el('p', null, 'Chess community accounts are not available yet. This page does not sign in with a master account, and nothing is stored on this device.')
       );
       return;
     }
@@ -380,7 +380,7 @@ export function mountProfile(root, options) {
     if (!options.configured) {
       root.append(
         el('p', 'eyebrow', 'Not configured'),
-        el('p', null, 'Profile pages need the Chess database migration and a publishable key. No member is shown, and nothing is stored on this device.')
+        el('p', null, 'Chess community accounts are not available yet. This page does not sign in with a master account, and no member is shown.')
       );
       return;
     }
