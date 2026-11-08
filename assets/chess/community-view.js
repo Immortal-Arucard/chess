@@ -78,7 +78,7 @@ export function mountCommunity(root, options) {
     if (!options.configured) {
       root.append(
         el('p', 'eyebrow', 'Not configured'),
-        el('p', null, 'Chess community accounts are not available yet. This page does not sign in with a master account, and nothing is stored on this device.')
+        el('p', null, 'Chess accounts could not be reached. This page does not sign in with a master account, and nothing is stored on this device.')
       );
       return;
     }
@@ -380,7 +380,7 @@ export function mountProfile(root, options) {
     if (!options.configured) {
       root.append(
         el('p', 'eyebrow', 'Not configured'),
-        el('p', null, 'Chess community accounts are not available yet. This page does not sign in with a master account, and no member is shown.')
+        el('p', null, 'Chess accounts could not be reached. This page does not sign in with a master account, and no member is shown.')
       );
       return;
     }

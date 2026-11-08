@@ -34,7 +34,7 @@ export function createChessGateway() {
     onAuth(fn) { listener = fn; },
     async session() {
       const response = await fetch('/api/session', { credentials: 'same-origin' });
-      if (!response.ok) throw new Error('Chess accounts are not available.');
+      if (!response.ok) throw new Error('Chess accounts could not be reached.');
       const body = await response.json();
       if (!body.authenticated) return null;
       return { user: { authenticated: true } };

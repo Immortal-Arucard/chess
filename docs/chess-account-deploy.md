@@ -10,7 +10,7 @@ The reviewed migration and Worker are already in place. Do not apply the migrati
 - Data API exposed schemas are `public` and `graphql_public` only. Keep `chess_private` and `chess_service` unexposed.
 - The Compass Site URL is unchanged. `https://chess.theworldgovernmentincorporated.com/api/auth/callback` is allowed.
 - The route is only `chess.theworldgovernmentincorporated.com/api/*`. The existing CNAME is proxied and GitHub Pages still serves the rest of the site. `workers.dev` and preview URLs are disabled. Query-string log redaction is enabled.
-- The account subdomain `theworldgovernmentincorporated.workers.dev` is registered. The cron `*/15 * * * *` was created at 2:12:23 PM EST on 8 November 2026. A cron execution has not been observed yet.
+- The account subdomain `theworldgovernmentincorporated.workers.dev` is registered. The cron `*/15 * * * *` was created at 2:12:23 PM EST on 8 November 2026. A later invocation was observed with outcome ok, from bounded metadata.
 - Anonymous `GET /api/session` and `GET /api/posts` returned 200 with `no-store`. The site root returned 200.
 - On 8 November 2026, a normal-browser sign-in on the published page reached “Signed in. No Chess profile yet.” at 2:26 PM EST. Sign out and a refresh showed “Not signed in.” at 2:28 PM EST. The live cookie flags were not inspected separately. No join, post, private row, or real game save has been tested.
 

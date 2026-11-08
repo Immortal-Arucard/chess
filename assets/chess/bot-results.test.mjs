@@ -98,7 +98,7 @@ const unavailable = applySave('manual', owner, preference, castle, pageBook);
 assert.equal(unavailable.outcome, 'unavailable');
 assert.equal(unavailable.status, 'unsaved');
 assert.equal(unavailable.record, castle);
-assert.match(unavailable.error, /not available/);
+assert.match(unavailable.error, /still unsaved/);
 assert.equal(pageBook.posts.length, 0);
 assert.equal(ACCOUNT_SAVE_UNAVAILABLE.includes('not an account save'), true);
 assert.equal(source.includes("outcome: 'saved'"), false);

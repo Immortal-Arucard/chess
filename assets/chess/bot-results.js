@@ -42,7 +42,7 @@ export function readDeviceRecovery(storage) {
 }
 
 export const ACCOUNT_SAVE_UNAVAILABLE =
-  'Saving to a Chess account is not available yet. This game is still unsaved. The full move record stays on this page until you discard it or leave after discarding. Download the PGN if you want a copy. A PGN download is not an account save.';
+  'The Chess account did not receive this game. It is still unsaved. The full move record stays on this page until you discard it or leave after discarding. Download the PGN if you want a copy. A PGN download is not an account save.';
 
 export function accountSaveService() {
   return {
@@ -75,7 +75,7 @@ export function accountSettingsView(account) {
     return {
       checked: false,
       disabled: true,
-      note: 'Automatically save bot-game results is an account setting. It is off by default and is stored with the Chess account, not on this device. Chess accounts are not available yet, so it cannot be turned on. When it is on, each finished bot game is saved once with every move, not only the outcome. Until then, finished games stay unsaved unless you later save them to an account.'
+      note: 'Automatically save bot-game results is off by default and is stored with the Chess account, not on this device. Sign in and click Join Chess before turning it on. When it is on, each finished bot game is saved once with every move, not only the outcome.'
     };
   }
   return {

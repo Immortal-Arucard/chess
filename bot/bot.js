@@ -542,7 +542,7 @@ function startGame() {
 
 function askLeave(action) {
   if (unsavedFinished()) {
-    notice = 'This finished game is still unsaved. Save is not available yet. Discard it or download the PGN before leaving. Leaving is blocked so the moves are not dropped.';
+    notice = 'This finished game is still unsaved. Save it to the Chess account or discard it before leaving. Leaving is blocked so the moves are not dropped.';
     render();
     return;
   }
