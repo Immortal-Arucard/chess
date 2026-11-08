@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
+import { chessAccess, cleanBody, cleanName, cleanReason, feedFilter, nextCursor, olderThan, profilePath, profileRoute, publicProfile } from './community-model.js';
 import { assertPublishable, communityConfig } from './community-config.js';
 
 const name = cleanName('  Ada  Lovelace ');
@@ -48,16 +48,31 @@ assert.equal(profileRoute({ pathname: '/community/profile/index.html', search: '
 const shown = publicProfile({ id: ada, display_name: 'Ada', created_at: '2026-11-08T00:00:00Z', email: 'ada@example.com' });
 assert.deepEqual(shown, { id: ada, displayName: 'Ada', createdAt: '2026-11-08T00:00:00Z' });
 assert.equal(Object.hasOwn(shown, 'email'), false);
+const signedInOnly = chessAccess({ authenticated: true, chessProfile: null });
+assert.deepEqual(signedInOnly, { authenticated: true, chessMember: false, otherServices: [] });
+const chessOnly = chessAccess({ authenticated: true, chessProfile: { id: ada } });
+assert.equal(chessOnly.chessMember, true);
+assert.deepEqual(chessOnly.otherServices, []);
+const shownOwner = publicProfile({ id: ada, display_name: 'Ada', created_at: '2026-11-08T00:00:00Z', owner_id: 'master-id', email: 'ada@example.com' });
+assert.equal(Object.hasOwn(shownOwner, 'owner_id'), false);
+assert.equal(Object.hasOwn(shownOwner, 'email'), false);
 
 const sql = readFileSync(new URL('../../supabase/chess_community.sql', import.meta.url), 'utf8');
-for (const table of ['chess_profiles', 'chess_admins', 'chess_posts', 'chess_replies', 'chess_reports']) {
+for (const table of ['chess_profiles', 'chess_posts', 'chess_replies', 'chess_reports']) {
   assert.match(sql, new RegExp('alter table public\\.' + table + ' enable row level security'));
   assert.match(sql, new RegExp('alter table public\\.' + table + ' force row level security'));
 }
 assert.match(sql, /chess_posts_by_author/);
-assert.match(sql, /using \(id = \(select auth\.uid\(\)\)\)/);
-assert.match(sql, /with check \(id = \(select auth\.uid\(\)\)\)/);
+assert.match(sql, /chess_private\.profile_owners/);
+assert.match(sql, /revoke all on chess_private\.profile_owners from public, anon, authenticated/);
+assert.doesNotMatch(sql, /grant select on chess_private\.profile_owners to anon/);
+assert.doesNotMatch(sql, /grant select on chess_private\.profile_owners to authenticated/);
+assert.doesNotMatch(sql, /chess_twgi_links/);
+assert.doesNotMatch(sql, /owner_id uuid[\s\S]{0,80}chess_profiles \(/);
 assert.doesNotMatch(sql, /email text/i);
+assert.match(sql, /no trigger on auth\.users/i);
+assert.doesNotMatch(sql, /create trigger[\s\S]{0,120}auth\.users/i);
+assert.doesNotMatch(sql, /join[\s\S]{0,40}email/i);
 assert.equal(sql.includes('public.profiles'), false);
 assert.equal(sql.includes('public.results'), false);
 assert.doesNotMatch(sql, /table public\.test_events|from public\.test_events/);

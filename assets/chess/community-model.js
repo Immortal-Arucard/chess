@@ -65,6 +65,14 @@ export function profileRoute(location) {
   return { page: 'profile', valid: true, reason: '', id };
 }
 
+export function chessAccess({ authenticated, chessProfile }) {
+  return {
+    authenticated: !!authenticated,
+    chessMember: !!chessProfile,
+    otherServices: []
+  };
+}
+
 export function publicProfile(row) {
   if (!row || !row.id) return null;
   return {

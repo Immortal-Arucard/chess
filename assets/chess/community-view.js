@@ -117,7 +117,7 @@ export function mountCommunity(root, options) {
       field('Email', email),
       field('Display name', name),
       button,
-      el('p', 'community-note', 'The link signs you in. The display name is saved only after you return and the database accepts it.')
+      el('p', 'community-note', 'The link only verifies this email. It does not join Chess or any other TWGI service. Joining Chess is a separate step after you return.')
     );
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -128,7 +128,7 @@ export function mountCommunity(root, options) {
       run(async () => {
         await gateway.signIn(emailResult.value, nameResult.value);
         pendingEmail = emailResult.value;
-        notice = 'Check ' + pendingEmail + ' for the sign-in link. No post was created.';
+        notice = 'Check ' + pendingEmail + ' for the sign-in link. No Chess profile and no other service membership was created.';
       });
     });
     root.append(form);
@@ -139,17 +139,22 @@ export function mountCommunity(root, options) {
     name.type = 'text';
     name.maxLength = LIMITS.name;
     name.value = gateway.suggestedName ? gateway.suggestedName() : '';
-    const button = el('button', 'tool', 'Save display name');
+    const button = el('button', 'tool', 'Join Chess');
     button.type = 'submit';
     const form = document.createElement('form');
-    form.append(field('Display name', name), button, signOutButton());
+    form.append(
+      field('Display name', name),
+      button,
+      signOutButton(),
+      el('p', 'community-note', 'Joining Chess creates your Chess profile only. It does not open other TWGI services.')
+    );
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const result = cleanName(name.value);
       if (!result.ok) { error = result.error; render(); return; }
       run(async () => {
         profile = await gateway.saveProfile(result.value);
-        notice = '';
+        notice = 'Chess profile saved. No other service was joined.';
         await loadFirst();
       });
     });
@@ -234,7 +239,7 @@ export function mountCommunity(root, options) {
     article.append(title, el('p', 'community-time', post.createdAt), textBlock(post.body));
     if (post.hidden) article.append(el('p', 'community-note', 'Hidden from other members.'));
     const bar = el('div', 'community-tools');
-    if (post.authorId === user.id) bar.append(deleteButton('Delete post', () => gateway.deletePost(post.id).then(loadFirst)));
+    if (profile && post.authorId === profile.id) bar.append(deleteButton('Delete post', () => gateway.deletePost(post.id).then(loadFirst)));
     else bar.append(reportControl(post.id, null));
     article.append(bar);
     const thread = replies.get(post.id) || { items: [], cursor: null, loaded: false };
@@ -267,7 +272,7 @@ export function mountCommunity(root, options) {
     title.append(authorLink(reply.authorName, reply.authorId));
     block.append(title, el('p', 'community-time', reply.createdAt), textBlock(reply.body));
     if (reply.hidden) block.append(el('p', 'community-note', 'Hidden from other members.'));
-    if (reply.authorId === user.id) {
+    if (profile && reply.authorId === profile.id) {
       block.append(deleteButton('Delete reply', () => gateway.deleteReply(reply.id).then(async () => {
         const page = await gateway.listReplies(reply.postId, { cursor: null, limit: LIMITS.pageSize });
         replies.set(reply.postId, { items: page.replies, cursor: page.nextCursor, loaded: true });
@@ -468,7 +473,7 @@ export function mountProfile(root, options) {
   }
   load(async () => {
     const session = await gateway.session();
-    viewer = session && session.user ? { id: session.user.id } : null;
+    viewer = await gateway.profile();
     person = await gateway.getPublicProfile(options.profileId);
     if (!person) return;
     const page = await gateway.listAuthorPosts(person.id, { cursor: null, limit: LIMITS.pageSize });

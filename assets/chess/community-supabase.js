@@ -58,22 +58,23 @@ export function createSupabaseGateway(client) {
     async profile() {
       const session = await this.session();
       if (!session) return null;
-      const result = await client.from('chess_profiles').select('id,display_name').eq('id', session.user.id).maybeSingle();
+      const result = await client.rpc('chess_my_profile');
       if (result.error) throw failed(result.error);
-      if (!result.data) return null;
-      return { id: result.data.id, displayName: result.data.display_name };
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (!row) return null;
+      return { id: row.id, displayName: row.display_name, createdAt: row.created_at };
     },
     async saveProfile(displayName) {
       const session = await this.session();
       if (!session) throw new Error('Sign in before choosing a display name.');
       const existing = await this.profile();
-      const write = existing
-        ? client.from('chess_profiles').update({ display_name: displayName }).eq('id', session.user.id).select('id,display_name').single()
-        : client.from('chess_profiles').insert({ id: session.user.id, display_name: displayName }).select('id,display_name').single();
-      const result = await write;
+      const result = existing
+        ? await client.rpc('chess_rename', { requested_name: displayName })
+        : await client.rpc('chess_join', { requested_name: displayName });
       if (result.error) throw failed(result.error);
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }
-      return { id: result.data.id, displayName: result.data.display_name };
+      return { id: row.id, displayName: row.display_name, createdAt: row.created_at };
     },
     async getPublicProfile(id) {
       const result = await client.from('chess_profiles').select('id,display_name,created_at').eq('id', id).maybeSingle();
@@ -100,9 +101,9 @@ export function createSupabaseGateway(client) {
       return { posts, nextCursor: nextCursor(posts, limit) };
     },
     async createPost(body) {
-      const session = await this.session();
-      if (!session) throw new Error('Sign in before posting.');
-      const result = await client.from('chess_posts').insert({ author_id: session.user.id, body }).select('id').single();
+      const mine = await this.profile();
+      if (!mine) throw new Error('Join Chess before posting.');
+      const result = await client.from('chess_posts').insert({ author_id: mine.id, body }).select('id').single();
       if (result.error) throw failed(result.error);
     },
     async listReplies(postId, { cursor, limit }) {
@@ -114,9 +115,9 @@ export function createSupabaseGateway(client) {
       return { replies, nextCursor: replies.length < limit ? null : { createdAt: replies[replies.length - 1].createdAt, id: replies[replies.length - 1].id } };
     },
     async createReply(postId, body) {
-      const session = await this.session();
-      if (!session) throw new Error('Sign in before replying.');
-      const result = await client.from('chess_replies').insert({ post_id: postId, author_id: session.user.id, body }).select('id').single();
+      const mine = await this.profile();
+      if (!mine) throw new Error('Join Chess before replying.');
+      const result = await client.from('chess_replies').insert({ post_id: postId, author_id: mine.id, body }).select('id').single();
       if (result.error) throw failed(result.error);
     },
     async deletePost(id) {
@@ -128,9 +129,9 @@ export function createSupabaseGateway(client) {
       if (result.error) throw failed(result.error);
     },
     async report({ postId, replyId, reason }) {
-      const session = await this.session();
-      if (!session) throw new Error('Sign in before reporting.');
-      const row = { reporter_id: session.user.id, reason, post_id: postId, reply_id: replyId };
+      const mine = await this.profile();
+      if (!mine) throw new Error('Join Chess before reporting.');
+      const row = { reporter_id: mine.id, reason, post_id: postId, reply_id: replyId };
       const result = await client.from('chess_reports').insert(row).select('id').single();
       if (result.error) throw failed(result.error);
     },
