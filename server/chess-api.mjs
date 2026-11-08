@@ -1,5 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
+import { validateGame } from './game-record.mjs';
+import { createSupabaseAuth } from './supabase-auth.mjs';
 
 const SESSION_COOKIE = '__Host-chess_session';
 const CSRF_COOKIE = 'chess_csrf';
@@ -52,14 +54,36 @@ function hashesEqual(left, right) {
   return timingSafeEqual(a, b);
 }
 
+function boundedLimit(value) {
+  const number = Number(value || 20);
+  if (!Number.isInteger(number) || number < 1) return 20;
+  return Math.min(number, 20);
+}
+
+function clientIp(req) {
+  return String((req.socket && req.socket.remoteAddress) || '');
+}
+
 async function readJson(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 65536) throw new Error('The request is too large.');
+    chunks.push(chunk);
+  }
   if (!chunks.length) return {};
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-export function createChessApp({ pool, origin, audience, masterAuthorize, exchangeCode }) {
+const AUTH_HEADERS = {
+  'cache-control': 'no-store',
+  'referrer-policy': 'no-referrer',
+  'x-content-type-options': 'nosniff'
+};
+
+export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchImpl }) {
+  const master = createSupabaseAuth({ url: supabaseUrl, apiKey: supabaseKey, fetchImpl: fetchImpl || fetch });
   async function query(text, params) {
     const client = await pool.connect();
     try {
@@ -99,7 +123,11 @@ export function createChessApp({ pool, origin, audience, masterAuthorize, exchan
     const url = new URL(req.url, origin);
     const token = cookieValue(req.headers.cookie, SESSION_COOKIE);
     const send = (status, body, extraHeaders) => {
-      const headers = Object.assign({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }, extraHeaders);
+      const headers = Object.assign({
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'referrer-policy': 'no-referrer'
+      }, extraHeaders);
       res.writeHead(status, headers);
       res.end(JSON.stringify(body));
     };
@@ -113,27 +141,58 @@ export function createChessApp({ pool, origin, audience, masterAuthorize, exchan
         return send(200, Object.assign({ configured: true }, session));
       }
       if (req.method === 'GET' && url.pathname === '/api/posts') {
-        const result = await query('select public.chess_posts($1, $2, $3, $4) as posts', [token || null, null, null, 20]);
-        return send(200, { posts: result.rows[0].posts });
+        const limit = boundedLimit(url.searchParams.get('limit'));
+        const result = await query('select chess_service.posts($1, $2, $3, $4, $5) as posts', [
+          token || null, null, url.searchParams.get('before') || null, url.searchParams.get('beforeId') || null, limit
+        ]);
+        return send(200, { posts: result.rows[0].posts, limit });
+      }
+      const profileMatch = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})$/i);
+      const authorPosts = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/posts$/i);
+      if (req.method === 'GET' && profileMatch) {
+        const result = await query('select chess_service.profile($1) as profile', [profileMatch[1]]);
+        if (!result.rows[0].profile) return send(404, { error: 'That profile was not found.' });
+        return send(200, result.rows[0].profile);
+      }
+      if (req.method === 'GET' && authorPosts) {
+        const limit = boundedLimit(url.searchParams.get('limit'));
+        const result = await query('select chess_service.posts($1, $2, $3, $4, $5) as posts', [
+          token || null, authorPosts[1], url.searchParams.get('before') || null, url.searchParams.get('beforeId') || null, limit
+        ]);
+        return send(200, { posts: result.rows[0].posts, limit });
       }
       if (req.method === 'GET' && url.pathname === '/api/auth/callback') {
-        const state = String(url.searchParams.get('state') || '');
+        const state = String(url.searchParams.get('auth_state') || '');
         const code = String(url.searchParams.get('code') || '');
         const cookieState = cookieValue(req.headers.cookie, STATE_COOKIE);
-        if (!state || state !== cookieState || !code) {
-          res.writeHead(303, { location: origin + '/community/', 'set-cookie': clearCookies() });
-          res.end();
-          return;
-        }
-        const handoff = randomToken();
-        await query('select public.chess_keep_code($1, $2, $3)', [state, code, handoff]);
-        res.writeHead(303, {
+        const fail = (status, error) => {
+          res.writeHead(status, Object.assign({
+            location: origin + '/community/',
+            'set-cookie': [
+              setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 }),
+              setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
+            ]
+          }, AUTH_HEADERS));
+          res.end(JSON.stringify({ error }));
+        };
+        if (!state || state !== cookieState || !code) return fail(303, 'Sign-in could not be completed.');
+        const consumed = await query('select verifier, redirect_uri from chess_service.consume_auth($1)', [state]);
+        const row = consumed.rows[0];
+        if (!row || row.redirect_uri !== origin + '/api/auth/callback?auth_state=' + state) return fail(303, 'Sign-in expired.');
+        const exchange = await master.exchange({ code, verifier: row.verifier });
+        if (!exchange || exchange.audience !== 'authenticated' || !exchange.masterId) return fail(303, 'Sign-in could not be completed.');
+        const sessionToken = randomToken();
+        const csrf = randomToken();
+        await query('select chess_service.complete_login($1, $2, $3)', [exchange.masterId, sessionToken, csrf]);
+        res.writeHead(303, Object.assign({
           location: origin + '/community/',
           'set-cookie': [
-            setCookie(HANDOFF_COOKIE, handoff, { httpOnly: true, maxAge: 300 }),
-            setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 })
+            setCookie(SESSION_COOKIE, sessionToken, { httpOnly: true, maxAge: 60 * 60 * 12 }),
+            setCookie(CSRF_COOKIE, csrf, { httpOnly: false, maxAge: 60 * 60 * 12 }),
+            setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 }),
+            setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
           ]
-        });
+        }, AUTH_HEADERS));
         res.end();
         return;
       }
@@ -141,47 +200,22 @@ export function createChessApp({ pool, origin, audience, masterAuthorize, exchan
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
       if (url.pathname === '/api/auth/start') {
         const body = await readJson(req);
+        const email = String(body.email || '');
         const state = randomToken();
         const verifier = randomToken();
         const challenge = codeChallenge(verifier);
-        await query('select public.chess_begin_auth($1, $2, $3, $4, $5, $6)', [
-          state, verifier, challenge, audience, origin + '/api/auth/callback', String(body.loginHint || '')
+        const redirectTo = origin + '/api/auth/callback?auth_state=' + encodeURIComponent(state);
+        await query('select chess_service.begin_sign_in($1, $2, $3, $4, $5, $6)', [
+          email, state, verifier, challenge, redirectTo, clientIp(req)
         ]);
-        const redirect = new URL(masterAuthorize);
-        redirect.searchParams.set('response_type', 'code');
-        redirect.searchParams.set('code_challenge', challenge);
-        redirect.searchParams.set('code_challenge_method', 'S256');
-        redirect.searchParams.set('state', state);
-        redirect.searchParams.set('audience', audience);
-        redirect.searchParams.set('redirect_uri', origin + '/api/auth/callback');
-        if (body.loginHint) redirect.searchParams.set('login_hint', String(body.loginHint));
-        return send(200, { redirect: redirect.toString() }, {
+        await master.sendMagicLink({ email, challenge, redirectTo });
+        return send(200, { sent: true }, {
           'set-cookie': setCookie(STATE_COOKIE, state, { httpOnly: true, maxAge: 600 })
         });
       }
-      if (url.pathname === '/api/auth/finish') {
-        const handoff = cookieValue(req.headers.cookie, HANDOFF_COOKIE);
-        const taken = await query('select code, verifier, audience, redirect_uri from public.chess_finish_material($1)', [handoff]);
-        const row = taken.rows[0];
-        if (!row || !row.code || row.audience !== audience || row.redirect_uri !== origin + '/api/auth/callback') {
-          return send(401, { error: 'Sign-in expired.' }, { 'set-cookie': clearCookies() });
-        }
-        const exchange = await exchangeCode({ code: row.code, verifier: row.verifier, audience: row.audience, redirectUri: row.redirect_uri });
-        if (!exchange || exchange.audience !== audience || !exchange.masterId) {
-          return send(401, { error: 'Sign-in could not be completed.' }, { 'set-cookie': clearCookies() });
-        }
-        const sessionToken = randomToken();
-        const csrf = randomToken();
-        await query('select public.chess_accept_login($1, $2, $3)', [exchange.masterId, sessionToken, csrf]);
-        return send(200, { authenticated: true, profile: null }, {
-          'set-cookie': [
-            setCookie(SESSION_COOKIE, sessionToken, { httpOnly: true, maxAge: 60 * 60 * 12 }),
-            setCookie(CSRF_COOKIE, csrf, { httpOnly: false, maxAge: 60 * 60 * 12 }),
-            setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
-          ]
-        });
-      }
       if (!token) return send(401, { error: 'Sign in before doing that.' });
+      const sessionCheck = await query('select public.chess_session($1) as session', [token]);
+      if (!sessionCheck.rows[0].session.authenticated) return send(401, { error: 'Sign in before doing that.' });
       if (!(await csrfOk(req, token))) return send(403, { error: 'The security token did not match this session.' });
       const body = await readJson(req);
       if (url.pathname === '/api/logout') {
@@ -231,7 +265,8 @@ export function createChessApp({ pool, origin, audience, masterAuthorize, exchan
         return send(200, result.rows[0].settings);
       }
       if (url.pathname === '/api/games') {
-        const result = await query('select public.chess_save_game($1, $2::jsonb) as saved', [token, JSON.stringify(body)]);
+        const hash = validateGame(body);
+        const result = await query('select chess_service.save_game($1, $2::jsonb, $3) as saved', [token, JSON.stringify(body), hash]);
         return send(200, result.rows[0].saved);
       }
       if (url.pathname === '/api/games/list') {

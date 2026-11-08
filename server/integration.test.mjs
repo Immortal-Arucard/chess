@@ -2,8 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import pg from '/tmp/chess-pg/node_modules/pg/lib/index.js';
+import pg from 'pg';
 import { Chess } from '../assets/vendor/chess.js/chess.js';
+import { createServer } from 'node:http';
 import { codeChallenge, createChessApp, randomToken } from './chess-api.mjs';
 
 const { Pool } = pg;
@@ -15,13 +16,9 @@ const bobMaster = '22222222-2222-4222-8222-222222222222';
 const masterSecret = 'master-access-token-should-never-leak';
 
 function psql(database, sql) {
-  const result = spawnSync('sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1'], {
-    input: sql,
-    encoding: 'utf8'
-  });
-  if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout);
-  }
+  const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1'], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1'], process.env];
+  const result = spawnSync(command[0], command[1], { input: sql, encoding: 'utf8', env: command[2] });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
 }
 
 function setup() {
@@ -38,6 +35,7 @@ function setup() {
   `);
   psql(db, readFileSync(new URL('../supabase/chess_community.sql', import.meta.url), 'utf8'));
   psql(db, readFileSync(new URL('../supabase/chess_service.sql', import.meta.url), 'utf8'));
+  psql(db, readFileSync(new URL('../supabase/chess_http.sql', import.meta.url), 'utf8'));
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;
@@ -82,45 +80,63 @@ async function request(port, jar, method, path, body, extra) {
   return { status: response.status, json, text, location: response.headers.get('location'), cookies: response.headers.getSetCookie ? response.headers.getSetCookie() : [] };
 }
 
-async function signIn(port, jar, masterId) {
-  const started = await request(port, jar, 'POST', '/api/auth/start', { loginHint: masterId + '@example.test' });
-  assert.equal(started.status, 200);
-  const redirect = new URL(started.json.redirect);
-  const state = redirect.searchParams.get('state');
-  const challenge = redirect.searchParams.get('code_challenge');
-  const code = randomToken();
-  const pending = { challenge, masterId, used: false };
-  exchange.codes.set(code, pending);
-  const callbackJar = jar;
-  const callback = await request(port, callbackJar, 'GET', '/api/auth/callback?state=' + encodeURIComponent(state) + '&code=' + encodeURIComponent(code));
-  assert.equal(callback.status, 303);
-  assert.equal(callback.location, origin + '/community/');
-  assert.equal(callback.text.includes(code), false);
-  assert.equal(callback.text.includes(masterSecret), false);
-  const finished = await request(port, jar, 'POST', '/api/auth/finish', {});
-  assert.equal(finished.status, 200, finished.text);
-  assert.equal(finished.json.authenticated, true);
-  assert.equal(finished.json.profile, null);
-  assert.equal(JSON.stringify(finished.json).includes(masterId), false);
-  assert.equal(finished.text.includes(masterSecret), false);
-  exchange.codes.get(code).challengeSeen = challenge;
-  return { code, challenge };
+function jwt(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return 'eyJhbGciOiJub25lIn0.' + body + '.sig';
 }
 
-const exchange = {
-  codes: new Map(),
-  async exchangeCode({ code, verifier, audience }) {
-    const row = exchange.codes.get(code);
-    if (!row || row.used) return null;
-    if (codeChallenge(verifier) !== row.challenge) return null;
-    if (audience !== 'chess') return null;
-    row.used = true;
-    return { masterId: row.masterId, audience, accessToken: masterSecret };
-  }
-};
+function startMaster() {
+  const challenges = new Map();
+  const tokens = new Map();
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://master.local');
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
+    if (req.method === 'POST' && url.pathname === '/auth/v1/otp') {
+      challenges.set(body.code_challenge, { email: body.email, redirect: url.searchParams.get('redirect_to'), used: false });
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/auth/v1/token') {
+      const challenge = codeChallenge(body.code_verifier || '');
+      const row = challenges.get(challenge);
+      if (!row || row.used || body.auth_code !== row.code) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"invalid"}');
+        return;
+      }
+      row.used = true;
+      const access = jwt({ aud: 'authenticated', sub: row.masterId, iss: 'http://127.0.0.1:' + masterPort + '/auth/v1' });
+      tokens.set(access, row.masterId);
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ access_token: access, user: { id: row.masterId } }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/auth/v1/user') {
+      const access = String(req.headers.authorization || '').replace('Bearer ', '');
+      const masterId = tokens.get(access);
+      if (!masterId) {
+        res.writeHead(401, { 'content-type': 'application/json' });
+        res.end('{}');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: masterId }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  return { server, challenges };
+}
 
+const master = startMaster();
+await new Promise((resolve) => master.server.listen(0, '127.0.0.1', resolve));
+const masterPort = master.server.address().port;
 setup();
-const digest = spawnSync('sudo', ['-u', 'postgres', 'psql', '-d', db, '-tA', '-c', "select n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='digest' order by 1"], { encoding: 'utf8' });
+const digest = spawnSync(process.env.PGHOST ? 'psql' : 'sudo', process.env.PGHOST ? ['-d', db, '-tA', '-c', "select n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='digest' order by 1"] : ['-u', 'postgres', 'psql', '-d', db, '-tA', '-c', "select n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='digest' order by 1"], { encoding: 'utf8', env: process.env });
 const digestSchemas = digest.stdout.trim().split('\n').filter(Boolean);
 assert.equal(digestSchemas.every((schema) => schema === 'extensions'), true, digest.stdout);
 assert.equal(digestSchemas.includes('public'), false);
@@ -133,12 +149,36 @@ await pool.query('select public.chess_cleanup()');
 const live = createChessApp({
   pool,
   origin,
-  audience: 'chess',
-  masterAuthorize: 'https://master.example.test/authorize',
-  exchangeCode: exchange.exchangeCode
+  supabaseUrl: 'http://127.0.0.1:' + masterPort,
+  supabaseKey: 'publishable-test-key'
 });
 await new Promise((resolve) => live.server.listen(0, '127.0.0.1', resolve));
 const port = live.server.address().port;
+async function signIn(appPort, jar, masterId) {
+  const email = masterId + '@example.test';
+  const started = await request(appPort, jar, 'POST', '/api/auth/start', { email });
+  assert.equal(started.status, 200, started.text);
+  assert.equal(started.json.sent, true);
+  const state = jar.get('__Host-chess_auth');
+  let challenge = '';
+  for (const [key, value] of master.challenges) {
+    if (value.email === email) challenge = key;
+  }
+  const code = randomToken();
+  master.challenges.get(challenge).code = code;
+  master.challenges.get(challenge).masterId = masterId;
+  const callback = await request(appPort, jar, 'GET', '/api/auth/callback?auth_state=' + encodeURIComponent(state) + '&code=' + encodeURIComponent(code));
+  assert.equal(callback.status, 303, callback.text);
+  assert.equal(callback.location, origin + '/community/');
+  assert.equal(callback.text.includes(code), false);
+  assert.equal(callback.text.includes(masterSecret), false);
+  assert.equal(jar.get('__Host-chess_session').length > 20, true);
+  const session = await request(appPort, jar, 'GET', '/api/session');
+  assert.equal(session.json.authenticated, true);
+  assert.equal(session.json.profile, null);
+  assert.equal(JSON.stringify(session.json).includes(masterId), false);
+}
+
 const ada = cookieJar();
 const bob = cookieJar();
 await signIn(port, ada, adaMaster);
@@ -185,11 +225,11 @@ game.move('e4');
 game.move('e5');
 const record = {
   clientGameId: '33333333-3333-4333-8333-333333333333',
-  pgn: game.pgn(),
+  pgn: game.pgn().replace('[Result "*"]', '[Result "0-1"]').replace(/\*\s*$/, '0-1'),
   startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   moves: game.history({ verbose: true }).map((move, index) => ({ ply: index + 1, san: move.san, uci: move.from + move.to, fen: move.after })),
-  result: '1/2-1/2',
-  termination: 'draw',
+  result: '0-1',
+  termination: 'resign',
   playerColor: 'white',
   opponentName: 'Stockfish 19 Lite',
   opponentUciElo: 1600,
@@ -198,6 +238,15 @@ const record = {
   pieceColor: 'ink',
   palette: 'midnight'
 };
+const emptyProfile = await request(port, cookieJar(), 'GET', '/api/profiles/' + adaJoin.json.id);
+assert.equal(emptyProfile.status, 200, emptyProfile.text);
+assert.equal(emptyProfile.json.displayName, 'Ada Lovelace');
+assert.ok(emptyProfile.json.createdAt);
+const missingProfile = await request(port, cookieJar(), 'GET', '/api/profiles/99999999-9999-4999-8999-999999999999');
+assert.equal(missingProfile.status, 404);
+const badDraw = Object.assign({}, record, { result: '1/2-1/2', termination: 'draw', clientGameId: '55555555-5555-4555-8555-555555555555' });
+const rejected = await request(port, ada, 'POST', '/api/games', badDraw, { 'x-csrf-token': ada.get('chess_csrf') });
+assert.notEqual(rejected.status, 200);
 const settings = await request(port, ada, 'POST', '/api/settings', {}, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.equal(settings.json.autoSaveBotResults, false);
 const saved = await request(port, ada, 'POST', '/api/games', record, { 'x-csrf-token': ada.get('chess_csrf') });
@@ -206,7 +255,7 @@ assert.equal(saved.json.status, 'saved');
 const again = await request(port, ada, 'POST', '/api/games', record, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.equal(again.json.duplicate, true);
 assert.equal(again.json.id, saved.json.id);
-const changed = Object.assign({}, record, { pgn: record.pgn + ' ' });
+const changed = Object.assign({}, record, { pieceStyle: 'bold' });
 const conflict = await request(port, ada, 'POST', '/api/games', changed, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.notEqual(conflict.status, 200);
 const listed = await request(port, ada, 'POST', '/api/games/list', {}, { 'x-csrf-token': ada.get('chess_csrf') });
@@ -220,17 +269,27 @@ const ratedSave = await request(port, ada, 'POST', '/api/games', rated, { 'x-csr
 assert.notEqual(ratedSave.status, 200);
 const burst = await Promise.all(Array.from({ length: 12 }, (_item, index) => request(port, ada, 'POST', '/api/posts', { body: 'burst ' + index }, { 'x-csrf-token': ada.get('chess_csrf') })));
 const burstOk = burst.filter((item) => item.status === 200).length;
-assert.equal(burstOk <= 9, true, String(burstOk));
+assert.equal(burstOk, 9, String(burstOk));
 assert.equal(burst.some((item) => item.status !== 200), true);
 psql(db, `update chess_private.browser_sessions set idle_expires_at = clock_timestamp() - interval '1 minute' where master_id = '${bobMaster}'`);
 const expired = await request(port, bob, 'POST', '/api/settings', {}, { 'x-csrf-token': bob.get('chess_csrf') });
 assert.notEqual(expired.status, 200);
+const oldCookie = ada.header();
 await request(port, ada, 'POST', '/api/logout', {}, { 'x-csrf-token': ada.get('chess_csrf') });
+const stale = await fetch('http://127.0.0.1:' + port + '/api/settings', {
+  method: 'POST',
+  headers: { origin, cookie: oldCookie, 'content-type': 'application/json', 'x-csrf-token': 'stale' },
+  body: '{}'
+});
+assert.equal(stale.status, 401);
 const replayed = await request(port, ada, 'POST', '/api/posts', { body: 'after logout' }, { 'x-csrf-token': ada.get('chess_csrf') });
 assert.equal(replayed.status, 401);
 const setting = await pool.query("select current_setting('chess.profile_id', true) as profile");
 assert.equal(setting.rows[0].profile || '', '');
+const revoked = await pool.query("select has_function_privilege('chess_server', 'chess_service.revoke_master(uuid)', 'execute') as allowed");
+assert.equal(revoked.rows[0].allowed, false);
 live.server.close();
+master.server.close();
 await pool.end();
 psql('postgres', `drop database if exists ${db};`);
 console.log('chess service integration tests passed');

@@ -71,13 +71,24 @@ export function createChessGateway() {
       return { id: body.id, displayName: body.displayName, createdAt: body.createdAt };
     },
     async getPublicProfile(id) {
-      const page = await this.listAuthorPosts(id);
-      const name = page.posts[0] && page.posts[0].authorName;
-      return { id, displayName: name || 'Member', createdAt: null };
+      const response = await fetch('/api/profiles/' + encodeURIComponent(id), { credentials: 'same-origin' });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('That profile could not be loaded.');
+      const body = await response.json();
+      return { id: body.id, displayName: body.displayName, createdAt: body.createdAt };
     },
-    async listAuthorPosts(authorId) {
-      const page = await this.listPosts();
-      return { posts: page.posts.filter((post) => post.authorId === authorId), nextCursor: null };
+    async listAuthorPosts(authorId, options) {
+      const cursor = options && options.cursor;
+      const limit = options && options.limit ? options.limit : 20;
+      const query = new URLSearchParams({ limit: String(limit) });
+      if (cursor) {
+        query.set('before', cursor.createdAt);
+        query.set('beforeId', cursor.id);
+      }
+      const response = await fetch('/api/profiles/' + encodeURIComponent(authorId) + '/posts?' + query.toString(), { credentials: 'same-origin' });
+      const body = await response.json();
+      const posts = body.posts || [];
+      return { posts, nextCursor: posts.length < limit ? null : { createdAt: posts[posts.length - 1].createdAt, id: posts[posts.length - 1].id } };
     },
     async listPosts() {
       const response = await fetch('/api/posts', { credentials: 'same-origin' });

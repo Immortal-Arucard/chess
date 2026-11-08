@@ -1,0 +1,24 @@
+{
+  "name": "chess-api",
+  "main": "server/worker.mjs",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  },
+  "routes": [
+    { "pattern": "chess.theworldgovernmentincorporated.com/api/*", "zone_name": "theworldgovernmentincorporated.com" }
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_CACHE_DISABLED_HYPERDRIVE_ID",
+      "localConnectionString": ""
+    }
+  ]
+}

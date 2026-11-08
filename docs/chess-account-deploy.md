@@ -8,9 +8,9 @@ This service is not deployed. Production data was not changed. The live bot rema
 2. Run `supabase/chess_community.sql`, then `supabase/chess_service.sql`. `pgcrypto` must be in the `extensions` schema. `extensions.digest` is the function the migration calls. `public.digest` is not used.
 3. Create a login role `chess_server` with a password if the migration's `NOLOGIN` role is still in place: `alter role chess_server login password '...';` Grant it `connect` on that database only. Do not grant it `chess_api`, `supabase_admin`, or the service role.
 4. Store that connection string as a secret named `DATABASE_URL` on the host that runs `node server/listen.mjs`. Do not commit it.
-5. Set `CHESS_ORIGIN=https://chess.theworldgovernmentincorporated.com` and `MASTER_AUTHORIZE_URL` / `MASTER_TOKEN_URL` to the existing TWGI master login. The audience value is `chess`.
-6. Leave the Compass Site URL as it is. Add one Chess redirect: `https://chess.theworldgovernmentincorporated.com/api/auth/callback`.
-7. Route only `/api/*` on the Chess hostname to this Node service. The static site can stay on GitHub Pages. A Cloudflare Worker route is appropriate if the hostname is already proxied by Cloudflare. No new paid database and no new Supabase project are required.
+5. Set `CHESS_ORIGIN=https://chess.theworldgovernmentincorporated.com`, `SUPABASE_URL` to the existing project URL, and `SUPABASE_ANON_KEY` to the publishable key. The service calls GoTrue `/auth/v1/otp`, `/auth/v1/token?grant_type=pkce`, and `/auth/v1/user`. It accepts only a provider-issued audience of `authenticated`.
+6. Leave the Compass Site URL as it is. Allow `https://chess.theworldgovernmentincorporated.com/api/auth/callback`. The email link lands there, the service completes the session, and it redirects to `/community/` without the code.
+7. Create a cache-disabled Hyperdrive configuration for the `chess_server` connection. Hyperdrive is included on the Workers Free plan at 100,000 queries a day. Put that configuration id in `wrangler.jsonc` and deploy the Worker. That deploy is a parent action. This run does not change DNS. GitHub Pages keeps the static site. The service worker does not cache `/api/`.
 8. Do not expose `chess_private` in the Data API. Do not put a publishable key or service-role key in the Chess page.
 
 ## Behavior the service implements
