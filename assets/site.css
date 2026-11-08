@@ -102,8 +102,14 @@ body.sheet{display:flex;flex-direction:column;align-items:center;padding:0 0 40p
 .page h1,.paper h1{
   font-family:"Cormorant Garamond",Georgia,serif;
   font-size:clamp(40px,8vw,64px);font-weight:600;line-height:1.05;margin:8px 0 0;
-  letter-spacing:.02em;color:#fff;
+  letter-spacing:.02em;color:#fff;overflow-wrap:break-word;
 }
+.page h2{
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:28px;font-weight:600;line-height:1.2;margin:28px 0 0;color:#fff;
+}
+.page .prose p{font-size:16px;line-height:1.65;color:#e8e8e8;margin:14px 0 0}
+.child a[aria-current="page"]{border-color:var(--sky);background:#071018}
 .eyebrow{margin:18px 0 0;color:var(--sky);letter-spacing:.18em;text-transform:uppercase;font-size:12px}
 .lead{font-size:18px;line-height:1.6;color:#e8e8e8}
 .primary{

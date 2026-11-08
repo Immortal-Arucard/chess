@@ -1,7 +1,34 @@
-const CACHE = 'chess-v1';
+const CACHE = 'chess-v2';
+const ROUTES = [
+  '/',
+  '/theory/',
+  '/human/',
+  '/bot/',
+  '/puzzles/',
+  '/analysis/',
+  '/community/',
+  '/marketplace/',
+  '/exchange/'
+];
 const ASSETS = [
   '/',
   '/index.html',
+  '/theory/',
+  '/theory/index.html',
+  '/human/',
+  '/human/index.html',
+  '/bot/',
+  '/bot/index.html',
+  '/puzzles/',
+  '/puzzles/index.html',
+  '/analysis/',
+  '/analysis/index.html',
+  '/community/',
+  '/community/index.html',
+  '/marketplace/',
+  '/marketplace/index.html',
+  '/exchange/',
+  '/exchange/index.html',
   '/manifest.webmanifest',
   '/assets/site.css',
   '/assets/site.js',
@@ -10,6 +37,20 @@ const ASSETS = [
   '/icons/icon-maskable-512.png',
   '/icons/apple-touch-icon.png'
 ];
+
+function lookup(pathname) {
+  if (ASSETS.indexOf(pathname) !== -1) return pathname;
+  if (pathname.length > 1 && pathname.endsWith('/index.html')) {
+    const dir = pathname.slice(0, -'index.html'.length);
+    if (ROUTES.indexOf(dir) !== -1) return dir;
+  }
+  if (pathname.length > 1 && !pathname.endsWith('/')) {
+    const slashed = pathname + '/';
+    if (ROUTES.indexOf(slashed) !== -1) return slashed;
+  }
+  if (ROUTES.indexOf(pathname) !== -1) return pathname;
+  return null;
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
@@ -29,21 +70,19 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  const cacheKey = new Request(url.pathname);
+  const key = lookup(url.pathname);
+  if (!key) return;
   event.respondWith((async () => {
     try {
       const response = await fetch(request);
       if (response && response.ok && response.type === 'basic' && !response.redirected) {
         const copy = response.clone();
         const cache = await caches.open(CACHE);
-        try { await cache.put(cacheKey, copy); } catch (e) {}
+        try { await cache.put(key, copy); } catch (e) {}
       }
       return response;
     } catch (err) {
-      return (await caches.match(cacheKey))
-        || (await caches.match('/index.html'))
-        || (await caches.match('/'))
-        || Response.error();
+      return (await caches.match(key)) || (await caches.match(url.pathname)) || Response.error();
     }
   })());
 });

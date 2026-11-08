@@ -4,7 +4,7 @@
 
   var MAIN = 'https://theworldgovernmentincorporated.com';
   function abs(href) {
-    if (href === 'self:/') return '/';
+    if (href.indexOf('self:') === 0) return href.slice(5) || '/';
     if (/^https?:\/\//.test(href)) return href;
     return MAIN + href;
   }
@@ -49,7 +49,20 @@
       href: '/recreation/',
       name: 'Recreation',
       children: [
-        { href: 'self:/', name: 'Chess' }
+        {
+          href: 'self:/',
+          name: 'Chess',
+          children: [
+            { href: 'self:/theory/', name: 'Taoist Aristo-Platonic Post-Hypermodernism' },
+            { href: 'self:/human/', name: 'Human versus human' },
+            { href: 'self:/bot/', name: 'Bot chess' },
+            { href: 'self:/puzzles/', name: 'Chess puzzles' },
+            { href: 'self:/analysis/', name: 'Game analysis' },
+            { href: 'self:/community/', name: 'Community' },
+            { href: 'self:/marketplace/', name: 'Marketplace' },
+            { href: 'self:/exchange/', name: 'Exchange' }
+          ]
+        }
       ]
     },
     { href: '/building/', name: 'Building' },
@@ -67,16 +80,30 @@
 
   var seq = 0;
 
+  function isCurrent(item) {
+    if (!item.href || item.href.indexOf('self:') !== 0) return false;
+    return norm(item.href.slice(5) || '/') === here();
+  }
+
+  function containsCurrent(item) {
+    if (isCurrent(item)) return true;
+    return (item.children || []).some(containsCurrent);
+  }
+
   function render(items) {
     return items.map(function (item) {
-      var onChess = item.href === 'self:/' && here() === '/';
-      var current = onChess ? ' aria-current="page"' : '';
+      var current = isCurrent(item) ? ' aria-current="page"' : '';
       var link = '<a href="' + abs(item.href) + '"' + current + '>' + item.name + '</a>';
       if (!item.children) return '<div class="nav-item">' + link + '</div>';
       var id = 'nav-branch-' + (++seq);
+      var open = (item.children || []).some(containsCurrent);
+      var expanded = open ? 'true' : 'false';
+      var label = (open ? 'Hide' : 'Show') + ' categories inside ' + item.name;
+      var glyph = open ? '\u2212' : '+';
+      var hidden = open ? '' : ' hidden';
       return '<div class="nav-item">' + link +
-        '<button type="button" class="expand" aria-expanded="false" aria-controls="' + id + '" aria-label="Show categories inside ' + item.name + '"><span aria-hidden="true">+</span></button>' +
-        '</div><ul id="' + id + '" class="nav-sub" hidden>' + render(item.children) + '</ul>';
+        '<button type="button" class="expand" aria-expanded="' + expanded + '" aria-controls="' + id + '" aria-label="' + label + '"><span aria-hidden="true">' + glyph + '</span></button>' +
+        '</div><ul id="' + id + '" class="nav-sub"' + hidden + '>' + render(item.children) + '</ul>';
     }).join('');
   }
 
