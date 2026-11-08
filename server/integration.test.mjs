@@ -92,6 +92,7 @@ function jwt(payload) {
 function startMaster() {
   const challenges = new Map();
   const tokens = new Map();
+  const control = { authorize: 'google' };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://master.local');
     const chunks = [];
@@ -119,9 +120,25 @@ function startMaster() {
         res.end('{"error":"authorize"}');
         return;
       }
+      if (url.searchParams.get('skip_http_redirect')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"authorize does not return json"}');
+        return;
+      }
       challenges.set(url.searchParams.get('code_challenge'), { email: 'google', redirect: url.searchParams.get('redirect_to'), used: false });
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ url: 'https://accounts.google.com/o/oauth2/v2/auth?state=test' }));
+      const locations = {
+        google: 'https://accounts.google.com/o/oauth2/v2/auth?state=test',
+        evil: 'https://evil.example/phish',
+        suffix: 'https://accounts.google.com.evil.example/o/oauth2/v2/auth',
+        insecure: 'http://accounts.google.com/o/oauth2/v2/auth'
+      };
+      if (control.authorize === 'json') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ url: locations.google }));
+        return;
+      }
+      res.writeHead(302, { location: locations[control.authorize] || locations.google });
+      res.end();
       return;
     }
     if (req.method === 'POST' && url.pathname === '/auth/v1/token') {
@@ -159,7 +176,7 @@ function startMaster() {
     res.writeHead(404);
     res.end();
   });
-  return { server, challenges };
+  return { server, challenges, control };
 }
 
 function assertReleaseRollsBack() {
@@ -232,8 +249,8 @@ const missingState = await request(port, cookieJar(), 'GET', '/api/auth/callback
 assert.equal(missingState.status, 303);
 assert.equal(missingState.location, origin + '/community/?auth=browser');
 assert.equal(missingState.text.includes('eyJ'), false);
-const canceled = await request(port, cookieJar(), 'GET', '/api/auth/callback?error=access_denied');
-assert.equal(canceled.location, origin + '/community/?auth=canceled');
+const providerDenied = await request(port, cookieJar(), 'GET', '/api/auth/callback?error=access_denied');
+assert.equal(providerDenied.location, origin + '/community/?auth=rejected');
 const failedStart = await request(port, cookieJar(), 'POST', '/api/auth/start', { email: 'fail@example.test' });
 assert.equal(failedStart.status, 400);
 assert.equal(failedStart.json.error, 'The account service could not send a sign-in link.');
@@ -286,6 +303,15 @@ assert.equal(JSON.stringify(googleSession.json).includes(adaMaster), false);
 await request(port, googleJar, 'POST', '/api/logout', {}, { 'x-csrf-token': googleJar.get('chess_csrf') });
 const signedOut = await request(port, googleJar, 'GET', '/api/session');
 assert.equal(signedOut.json.authenticated, false);
+for (const mode of ['evil', 'json']) {
+  master.control.authorize = mode;
+  const badGoogle = await request(port, cookieJar(), 'POST', '/api/auth/google', {});
+  assert.equal(badGoogle.status, 400, mode + ' ' + badGoogle.text);
+  assert.equal(badGoogle.json.error, 'Google sign-in could not start.');
+  assert.equal(badGoogle.text.includes('evil.example'), false);
+  assert.equal(badGoogle.text.includes('accounts.google.com'), false);
+}
+master.control.authorize = 'google';
 const joinWithoutSession = await request(port, cookieJar(), 'POST', '/api/join', { displayName: 'Nobody' });
 assert.equal(joinWithoutSession.status, 401);
 assert.equal(joinWithoutSession.text.includes('eyJ'), false);

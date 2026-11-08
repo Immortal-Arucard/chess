@@ -33,8 +33,7 @@ export function mountCommunity(root, options) {
   const authNotices = {
     browser: 'This sign-in link was opened without the browser session that requested it. Request a new link in that same browser.',
     expired: 'This sign-in link expired or was already used. Request a new one.',
-    rejected: 'The sign-in link was not accepted. Request a new one.',
-    canceled: 'Google sign-in was canceled.'
+    rejected: 'The sign-in provider did not complete the request. Request a new link in this browser.'
   };
   try {
     const params = new URL(window.location.href).searchParams;

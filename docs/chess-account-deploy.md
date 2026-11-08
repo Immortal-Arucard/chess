@@ -1,11 +1,11 @@
 # Chess account service deployment
 
-The reviewed migration and Worker are already in place. Do not apply the migration again, and do not upload a different Worker bundle over `chess-api`. `main` is `5762fc36d06f6b6006d1cd4f1a75fb8fbcaf888a`, which includes the live bot `20d38e8e746e4720e0f6c6a8e7d5d171c77d3661` and the temporary sign-in page. This branch replaces that page with the full community UI. Join, posts, and account save are not launched.
+The reviewed SQL migration is already applied. Do not apply it again. The Worker now serving production is still the `1925b2a8` module. This branch changes that module. It is not deployed. A later deploy replaces only the module and keeps the same Worker name, route, Hyperdrive binding, and secrets.
 
 ## Already applied
 
 - Migration `supabase/chess_release.sql` from `1925b2a8e191dea47b16f6a46cd0aa8caf47d3d9` is applied as Supabase migration version `20261108174719`. Its SHA256 is `2607b715ed5c8c18930748891b0187237a6a7d06ee2ba9200f43b20c8e0e2d7c`. Leave that version in place.
-- Worker `chess-api` is deployed from that same commit. The main module SHA256 is `9d460b57856c0e5ef8fb1d5b6aa6ce1b3554a37ed7e68c344f6b45da0d298079`. Compatibility date `2026-11-08`. Flag `nodejs_compat`.
+- The Worker now serving production is `chess-api` from that same commit. Its module SHA256 is `9d460b57856c0e5ef8fb1d5b6aa6ce1b3554a37ed7e68c344f6b45da0d298079`. Compatibility date `2026-11-08`. Flag `nodejs_compat`. This branch builds a different module. Deploying it keeps the Hyperdrive id, route, and secrets below. Do not publish `wrangler.jsonc` while its Hyperdrive id is still the placeholder.
 - Hyperdrive `fc681330ac0540309ebf509fdd3f3fa8` is direct, uses role `chess_server`, has caching disabled, and has a maximum of 5 connections. `chess_authority` stays `NOLOGIN` and is not on the Worker or Hyperdrive.
 - Data API exposed schemas are `public` and `graphql_public` only. Keep `chess_private` and `chess_service` unexposed.
 - The Compass Site URL is unchanged. `https://chess.theworldgovernmentincorporated.com/api/auth/callback` is allowed.
@@ -18,17 +18,17 @@ The reviewed migration and Worker are already in place. Do not apply the migrati
 
 `GET /api/auth/start` returns 405. Sign-in is a POST.
 
-On 8 November 2026 at 3:03 PM EST, an emailed link returned to Community still signed out, with “The request could not be completed.” From 2:55 to 3:05:30 PM the Worker recorded six `GET /api/session` responses at 200, one `POST /api/auth/start` at 200, one `POST /api/auth/start` at 400, two `GET /api/auth/callback` responses at 303, and one canceled callback. No 5xx was returned. A 303 is also how this service redirects a rejected callback, so those 303s are not proof that a session cookie was set. The generic sentence is the fallback for a 400 whose message is not in the public list; the sign-in form displays that response. Session 200 with the signed-out page is a separate result from the callback. The provider settings response showed Google and email enabled. That flag does not prove the Google client credentials or consent screen. No response bodies, cookies, or private logs were read for this incident.
+On 8 November 2026 at 3:03 PM EST, an emailed link left Community signed out, and the page showed “The request could not be completed.” From 2:55 to 3:05:30 PM the Worker metadata listed six `GET /api/session` responses at 200, one `POST /api/auth/start` at 200, one `POST /api/auth/start` at 400, two `GET /api/auth/callback` responses at 303, and one callback the client canceled. No 5xx was listed. Response bodies, cookies, and private logs were not read, so those counts do not establish why the browser stayed signed out. The public settings response listed Google and email as enabled. That does not prove the Google client credentials or consent screen.
 
 ## Google sign-in
 
-Continue with Google uses the same opaque Chess session as the email link. The browser is sent to Google, then to `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`, then back to `https://chess.theworldgovernmentincorporated.com/api/auth/callback` with a one-time code. Chess exchanges that code on the server. The page does not receive a master token. Joining Chess is still a separate button.
+Continue with Google uses the same opaque Chess session as the email link. Chess asks GoTrue `GET /auth/v1/authorize` and reads only its 302 `Location`. It does not follow that redirect. The browser then goes to Google, Google returns to `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`, and Supabase returns to `https://chess.theworldgovernmentincorporated.com/api/auth/callback` with a one-time code. Chess exchanges that code on the server. The page does not receive a master token. Joining Chess is still a separate button. `access_denied` is shown as a provider refusal, not as proof the person canceled.
 
-Before this works in production, the parent deploys the new Worker bundle. Do not apply `supabase/chess_release.sql` again. In Google Cloud, the authorized redirect URI remains `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`. The Chess callback is already on the Supabase allowlist. The Google provider stays enabled with its client id and secret stored in Supabase, not in this repository. The publishable key remains the Worker secret `SUPABASE_ANON_KEY` and is not placed on the Google URL.
+This module is not the one serving production. The parent deploys it before Continue with Google or the callback notices work. Do not apply `supabase/chess_release.sql` again. Keep Hyperdrive `fc681330ac0540309ebf509fdd3f3fa8`, the `/api/*` route, and the existing Worker secrets. In Google Cloud, the authorized redirect URI remains `https://xfswvbxuhgqbdqpqiywa.supabase.co/auth/v1/callback`. The Chess callback is already on the Supabase allowlist. The Google client id and secret stay in Supabase. `SUPABASE_ANON_KEY` is not placed on the Google URL.
 
 ## Next candidate
 
-This branch is the candidate for the next real check. Publishing it replaces the temporary sign-in page with the community page: email sign-in, an explicit Join Chess step, posts, and the bot’s account save, discard, recovery, and board replay. The bot’s existing colors, piece sets, and strength choices stay. The Worker and SQL bytes stay the reviewed `1925b2a8` bytes. Do not reapply the migration or deploy another backend for this page.
+Publishing the site without the new Worker leaves Continue with Google and the callback notices on the old module. SQL bytes stay the applied `1925b2a8` migration. The Worker module in this branch is new and is deployed separately, with the same bindings, route, and secrets.
 
 Local and CI checks of join and save used a stand-in identity service and a throwaway database. They are not production results. The first production join and the first production saved game happen only if this candidate is published and then used.
 

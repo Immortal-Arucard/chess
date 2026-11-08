@@ -224,7 +224,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
           res.end();
         };
         try {
-          if (url.searchParams.get('error') === 'access_denied') return authRedirect('canceled');
+          if (url.searchParams.get('error')) return authRedirect('rejected');
           const state = cookieValue(req.headers.cookie, STATE_COOKIE);
           const code = String(url.searchParams.get('code') || '');
           if (!state) return authRedirect('browser');
