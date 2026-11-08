@@ -30,6 +30,9 @@ jobs:
         with:
           node-version: 22
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: |
+          curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb
       - run: npm install --prefix server
       - run: node assets/chess/bot-results.test.mjs
       - run: node assets/chess/community-model.test.mjs
@@ -40,3 +43,7 @@ jobs:
         env:
           CI: "1"
           WRANGLER_SEND_METRICS: "false"
+      - run: node server/browser-e2e.mjs
+        env:
+          CI: "1"
+          CHROME_PATH: /usr/bin/google-chrome

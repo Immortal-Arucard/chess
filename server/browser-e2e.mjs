@@ -2,16 +2,28 @@ import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:https';
 import { createServer as createHttp } from 'node:http';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { codeChallenge, createChessApp, randomToken } from './chess-api.mjs';
 
-const require = createRequire(process.env.PUPPETEER_CORE || '/tmp/pw/node_modules/puppeteer-core/package.json');
+const bundledCore = fileURLToPath(new URL('./node_modules/puppeteer-core/package.json', import.meta.url));
+const require = createRequire(process.env.PUPPETEER_CORE || (existsSync(bundledCore) ? bundledCore : '/tmp/pw/node_modules/puppeteer-core/package.json'));
 const puppeteer = require('puppeteer-core');
 const chromePath = process.env.CHROME_PATH || '/usr/bin/google-chrome';
+const shotDir = (() => {
+  const preferred = '/opt/cursor/artifacts';
+  try {
+    mkdirSync(preferred, { recursive: true });
+    return preferred;
+  } catch (err) {
+    const fallback = '/tmp/chess-shots';
+    mkdirSync(fallback, { recursive: true });
+    return fallback;
+  }
+})();
 const root = fileURLToPath(new URL('..', import.meta.url));
 const db = 'chess_browser_' + randomBytes(3).toString('hex');
 const password = randomBytes(12).toString('hex');
@@ -22,6 +34,12 @@ function psql(database, sql) {
   const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1'], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1'], process.env];
   const result = spawnSync(command[0], command[1], { input: sql, encoding: 'utf8', env: command[2] });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+}
+function psqlValue(database, sql) {
+  const command = process.env.PGHOST ? ['psql', ['-d', database, '-tA', '-v', 'ON_ERROR_STOP=1', '-c', sql], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-tA', '-v', 'ON_ERROR_STOP=1', '-c', sql], process.env];
+  const result = spawnSync(command[0], command[1], { encoding: 'utf8', env: command[2] });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return result.stdout.trim();
 }
 function psqlFile(database, file) {
   const command = process.env.PGHOST ? ['psql', ['-d', database, '-v', 'ON_ERROR_STOP=1', '-f', file], process.env] : ['sudo', ['-u', 'postgres', 'psql', '-d', database, '-v', 'ON_ERROR_STOP=1', '-f', file], process.env];
@@ -135,10 +153,26 @@ async function signIn(email, name, masterId) {
   await page.waitForFunction((expected) => document.body.innerText.includes('Signed in as ' + expected), {}, name);
 }
 
-try {
-  await signIn('ada@example.test', 'Ada Lovelace', adaMaster);
-  await page.goto(origin + '/bot/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#start-game');
+let intercept = false;
+let armHold = false;
+let heldSession = null;
+let gameSaves = 0;
+page.on('request', (request) => {
+  if (!intercept) return;
+  const url = new URL(request.url());
+  if (request.method() === 'POST' && url.pathname === '/api/games') {
+    gameSaves += 1;
+    request.continue();
+    return;
+  }
+  if (armHold && request.method() === 'GET' && url.pathname === '/api/session') {
+    heldSession = request;
+    return;
+  }
+  request.continue();
+});
+
+async function playE4() {
   await page.click('#start-game');
   await page.waitForFunction(() => document.getElementById('engine-status').textContent.includes('Engine ready'));
   const moveInfo = await page.evaluate(() => {
@@ -155,7 +189,47 @@ try {
     };
   });
   if (!String(moveInfo.moves).includes('e4')) throw new Error(JSON.stringify(moveInfo));
-  await page.click('#resign');
+}
+
+try {
+  await signIn('ada@example.test', 'Ada Lovelace', adaMaster);
+  await page.goto(origin + '/bot/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#elo-choices button');
+  await page.evaluate(() => [...document.querySelectorAll('#elo-choices button')].find((button) => button.textContent === '2000').click());
+  await playE4();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.getElementById('moves').textContent.includes('e4') && document.body.dataset.phase === 'playing');
+  const recoveredSummary = await page.$eval('#game-summary', (el) => el.textContent);
+  if (!recoveredSummary.includes('2000')) throw new Error('recovery dropped the starting limit: ' + recoveredSummary);
+  await page.screenshot({ path: join(shotDir, 'browser-recovery-playing.png') });
+  await page.evaluate(() => document.getElementById('resign').click());
+  await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('Not saved'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.body.dataset.phase === 'ended' && document.getElementById('moves').textContent.includes('e4') && document.getElementById('save-status').textContent.includes('Not saved'));
+  await page.screenshot({ path: join(shotDir, 'browser-recovery-unsaved.png') });
+  intercept = true;
+  await page.setRequestInterception(true);
+  armHold = true;
+  await page.evaluate(() => document.getElementById('save-account').click());
+  const holdStarted = Date.now();
+  while (!heldSession) {
+    if (Date.now() - holdStarted > 10000) throw new Error('the save did not reach the session check');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  await page.evaluate(() => document.getElementById('discard-result').click());
+  heldSession.continue();
+  armHold = false;
+  await page.waitForFunction(() => document.body.dataset.phase === 'setup');
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  if (gameSaves !== 0) throw new Error('discard let a save request through: ' + gameSaves);
+  const stored = psqlValue(db, 'select count(*) from chess_private.bot_games');
+  if (stored !== '0') throw new Error('discard stored ' + stored + ' games');
+  await page.screenshot({ path: join(shotDir, 'browser-discard.png') });
+  intercept = false;
+  await page.setRequestInterception(false);
+  console.log('recovery restored the move and limit; discard sent no save');
+  await playE4();
+  await page.evaluate(() => document.getElementById('resign').click());
   await page.click('#save-account');
   await page.waitForFunction(() => document.getElementById('save-status').textContent.includes('Saved'));
   const savedText = await page.$eval('#save-status', (el) => el.textContent);
@@ -172,6 +246,12 @@ try {
   const afterBoard = await page.$eval('#replay-board', (el) => el.innerHTML);
   const after = await page.$eval('#replay-status', (el) => el.textContent);
   if (before === after || beforeBoard === afterBoard) throw new Error('replay did not move the board');
+  console.log('replay moved from ' + JSON.stringify(before) + ' to ' + JSON.stringify(after));
+  await page.evaluate(() => {
+    document.getElementById('game-window').hidden = true;
+    document.getElementById('replay-panel').scrollIntoView({ block: 'center' });
+  });
+  await page.screenshot({ path: join(shotDir, 'browser-replay.png') });
   await page.evaluate(() => document.getElementById('autosave-bot').click());
   await page.waitForFunction(() => document.getElementById('autosave-note').textContent.includes('Finished bot games are saved'));
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -188,7 +268,8 @@ try {
   await page.waitForFunction(() => document.getElementById('end-panel').innerText.includes('different Chess account'));
   const bobList = await page.$eval('#saved-games-list', (el) => el.textContent);
   if (bobList.includes('Replay')) throw new Error('the other account listed the first game');
-  console.log('browser completed-game save, reload, replay, settings, and owner switch passed');
+  await page.screenshot({ path: join(shotDir, 'browser-account-switch.png') });
+  console.log('browser recovery, pre-send discard, save, reload, replay, settings, and owner switch passed');
 } catch (err) {
   console.error(err && err.stack);
   console.error(logs.join('\n'));

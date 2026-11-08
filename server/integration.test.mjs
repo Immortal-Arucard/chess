@@ -344,6 +344,11 @@ const revoked = await pool.query("select has_function_privilege('chess_server', 
 assert.equal(revoked.rows[0].allowed, false);
 const authority = await pool.query("select has_function_privilege('chess_authority', 'chess_service.chess_revoke_master(uuid)', 'execute') as allowed");
 assert.equal(authority.rows[0].allowed, true);
+const logins = await pool.query("select rolname, rolcanlogin from pg_roles where rolname in ('chess_server', 'chess_authority') order by rolname");
+assert.deepEqual(logins.rows, [
+  { rolname: 'chess_authority', rolcanlogin: false },
+  { rolname: 'chess_server', rolcanlogin: true }
+]);
 assert.equal(Number(revoked.rows[0].public_definers), 0);
 const workerMod = await import('./worker.mjs');
 const workerEnv = {
