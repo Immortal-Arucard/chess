@@ -7,9 +7,9 @@ export const PALETTES = [
 ];
 
 export const PIECE_STYLES = [
-  { id: 'line', label: 'Line' },
-  { id: 'solid', label: 'Solid' },
-  { id: 'outline', label: 'Outline' }
+  { id: 'standard', label: 'Standard' },
+  { id: 'bold', label: 'Bold' },
+  { id: 'contour', label: 'Contour' }
 ];
 
 export const PIECE_COLORS = [
@@ -52,7 +52,7 @@ export function strengthCommands(elo) {
 }
 
 export function defaultPrefs() {
-  return { palette: 'midnight', pieceStyle: 'line', pieceColor: 'ink', elo: DEFAULT_ELO };
+  return { palette: 'midnight', pieceStyle: 'standard', pieceColor: 'ink', elo: DEFAULT_ELO };
 }
 
 export function sanitizePrefs(value) {

@@ -25,8 +25,9 @@ const memory = {
   setItem(_key, value) { this.value = value; }
 };
 assert.deepEqual(loadPrefs(memory), defaultPrefs());
-savePrefs(memory, { palette: 'sea', pieceStyle: 'outline', pieceColor: 'ivory', elo: 3190, extra: 'no' });
-assert.deepEqual(loadPrefs(memory), { palette: 'sea', pieceStyle: 'outline', pieceColor: 'ivory', elo: 3190 });
+savePrefs(memory, { palette: 'sea', pieceStyle: 'contour', pieceColor: 'ivory', elo: 3190, extra: 'no' });
+assert.deepEqual(loadPrefs(memory), { palette: 'sea', pieceStyle: 'contour', pieceColor: 'ivory', elo: 3190 });
+assert.equal(defaultPrefs().pieceStyle, 'standard');
 savePrefs(memory, { palette: 'nope', elo: 100 });
 assert.equal(loadPrefs(memory).palette, 'midnight');
 assert.equal(loadPrefs(memory).elo, 1600);

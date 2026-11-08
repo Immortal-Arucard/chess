@@ -1,24 +1,8 @@
+import { pieceMarkup } from './piece-sets.js';
 import { pieceName } from './rules.js';
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
-
-function pieceSvg(type, color, style, colors) {
-  const fill = color === 'w' ? colors.lightFill : colors.darkFill;
-  const stroke = color === 'w' ? colors.lightStroke : colors.darkStroke;
-  const width = style === 'solid' ? '1.2' : '2.4';
-  const paint = style === 'outline' ? 'none' : fill;
-  const common = `fill="${paint}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round"`;
-  const shapes = {
-    p: `<circle cx="20" cy="14" r="5" ${common}/><path d="M12 30h16l-2-8H14z" ${common}/>`,
-    r: `<path d="M11 12h4v3h3v-3h4v3h3v-3h4v6H11zm0 6h18v12H11z" ${common}/>`,
-    n: `<path d="M14 31h14l-2-6 5-4c2-4-1-9-6-9-3 0-4 2-5 3l-4-2 1 6-4 3z" ${common}/>`,
-    b: `<path d="M20 8l8 8-8 4-8-4z" ${common}/><path d="M16 22h8l2 9H14z" ${common}/><path d="M20 8v6" stroke="${stroke}" stroke-width="1.4"/>`,
-    q: `<path d="M8 16l4 4 8-8 8 8 4-4-3 15H11z" ${common}/>`,
-    k: `<path d="M18 7h4v4h4v4h-4v3h6l-2 13H14l-2-13h6V15h-4v-4h4z" ${common}/>`
-  };
-  return `<svg viewBox="0 0 40 40" aria-hidden="true">${shapes[type] || ''}</svg>`;
-}
 
 export function mountBoard(root, onSquare) {
   let focus = 'e2';
@@ -52,7 +36,7 @@ export function mountBoard(root, onSquare) {
     root.replaceChildren();
     root.className = 'board';
     root.dataset.palette = state.palette || 'midnight';
-    root.dataset.pieceStyle = state.pieceStyle || 'line';
+    root.dataset.pieceStyle = state.pieceStyle || 'standard';
     root.dataset.pieceColor = state.pieceColor || 'ink';
     root.setAttribute('role', 'grid');
     root.setAttribute('aria-label', 'Chessboard');
@@ -86,7 +70,7 @@ export function mountBoard(root, onSquare) {
         if (state.checkSquare === square) label += ', in check';
         button.setAttribute('aria-label', label);
         const colors = state.pieceColors || { lightFill: '#ffffff', lightStroke: '#111111', darkFill: '#111111', darkStroke: '#4fc3ff' };
-        if (piece) button.innerHTML = pieceSvg(piece.type, piece.color, state.pieceStyle || 'line', colors);
+        if (piece) button.innerHTML = pieceMarkup(piece.type, piece.color, state.pieceStyle || 'standard', colors);
         button.addEventListener('click', () => {
           focus = square;
           if (state.interactive) onSquare(square);

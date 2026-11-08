@@ -1,4 +1,4 @@
-const CACHE = 'chess-v4';
+const CACHE = 'chess-v5';
 const ROUTES = [
   '/',
   '/theory/',
@@ -37,6 +37,9 @@ const ASSETS = [
   '/assets/chess/board.js',
   '/assets/chess/board.css',
   '/assets/chess/bot-prefs.js',
+  '/assets/chess/piece-sets.js',
+  '/assets/chess/piece-sets-LICENSE.txt',
+  '/assets/chess/bot-results.js',
   '/bot/bot.js',
   '/assets/vendor/chess.js/chess.js',
   '/assets/vendor/chess.js/LICENSE',
