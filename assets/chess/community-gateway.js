@@ -74,20 +74,46 @@ export function createChessGateway() {
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }
       listener();
     },
-    async saveProfile(displayName) {
-      const existing = await this.profile();
-      const body = existing
-        ? await send('/api/profile/rename', { displayName })
-        : await send('/api/join', { displayName });
+    async joinChess(displayName) {
+      const body = await send('/api/join', { displayName });
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }
       return { id: body.id, displayName: body.displayName, createdAt: body.createdAt };
+    },
+    async renameProfile(displayName, authorId) {
+      const body = await send('/api/profile/rename', { displayName, authorId });
+      return { id: body.id, displayName: body.displayName, createdAt: body.createdAt || '' };
     },
     async getPublicProfile(id) {
       const response = await fetch('/api/profiles/' + encodeURIComponent(id), { credentials: 'same-origin' });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('That profile could not be loaded.');
       const body = await response.json();
-      return { id: body.id, displayName: body.displayName, createdAt: body.createdAt };
+      return {
+        id: body.id,
+        displayName: body.displayName,
+        createdAt: body.createdAt,
+        bio: body.bio || '',
+        hasPortrait: !!body.hasPortrait,
+        hasBackground: !!body.hasBackground
+      };
+    },
+    async saveProfileBio(bio, authorId) {
+      return send('/api/profile/bio', { bio, authorId });
+    },
+    async saveProfileImage(kind, bytes, type, authorId) {
+      const response = await fetch('/api/profile/' + kind, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'content-type': type,
+          'x-csrf-token': csrfToken(),
+          'x-chess-profile': authorId
+        },
+        body: bytes
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw failed(response, payload);
+      return payload;
     },
     async listAuthorPosts(authorId, options) {
       const cursor = options && options.cursor;

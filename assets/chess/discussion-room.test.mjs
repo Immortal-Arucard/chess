@@ -80,7 +80,7 @@ async function flush() {
 }
 
 installDom();
-const { mountDiscussion } = await import('./community-view.js');
+const { mountDiscussion, mountProfile } = await import('./community-view.js');
 
 const ada = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000000a';
 const bob = 'bbbbbbbb-bbbb-4bbb-8bbb-00000000000b';
@@ -241,5 +241,71 @@ await racePoll;
 assert.equal(latestReads, 1);
 assert.equal(raceCalls.includes('m4'), false);
 assert.deepEqual(raced.querySelector('#discussion-log').children.map((node) => node.textContent), ['Ada one', 'Ada two', 'Ada three', 'Ada four']);
+
+function findAll(node, match, found = []) {
+  if (match(node)) found.push(node);
+  for (const child of node.children || []) findAll(child, match, found);
+  return found;
+}
+
+let account = { id: ada, displayName: 'Ada Lovelace' };
+let holdRename = false;
+let releaseRename;
+const renameGate = new Promise((resolve) => { releaseRename = resolve; });
+const renameCalls = [];
+const profileRoot = document.createElement('div');
+mountProfile(profileRoot, {
+  configured: true,
+  valid: true,
+  profileId: ada,
+  gateway: {
+    async session() { return { user: { authenticated: true } }; },
+    async profile() {
+      if (holdRename) await renameGate;
+      return account;
+    },
+    async getPublicProfile() {
+      return { id: ada, displayName: 'Ada Lovelace', createdAt: '2026-11-08T00:00:00.000Z', bio: '', hasPortrait: false, hasBackground: false };
+    },
+    async listAuthorPosts() { return { posts: [], nextCursor: null }; },
+    async joinChess() { renameCalls.push('join'); throw new Error('joined the wrong account'); },
+    async renameProfile(name, authorId) {
+      renameCalls.push(['rename', name, authorId]);
+      return { id: authorId, displayName: name };
+    }
+  }
+});
+await flush();
+function nameBox() {
+  return findAll(profileRoot, (node) => node.tagName === 'input' && node.type === 'text')[0];
+}
+function saveName() {
+  return findAll(profileRoot, (node) => node.tagName === 'button' && node.textContent === 'Save display name')[0];
+}
+nameBox().value = 'Ada Renamed';
+saveName().listeners.click();
+await flush();
+assert.deepEqual(renameCalls, [['rename', 'Ada Renamed', ada]]);
+account = null;
+nameBox().value = 'Should not join';
+saveName().listeners.click();
+await flush();
+assert.equal(renameCalls.includes('join'), false);
+assert.equal(renameCalls.length, 1);
+assert.match(profileRoot.textContent, /own Chess profile/);
+account = { id: bob, displayName: 'Bob Stone' };
+nameBox().value = 'Should not rename Bob';
+saveName().listeners.click();
+await flush();
+assert.equal(renameCalls.length, 1);
+holdRename = true;
+account = { id: ada, displayName: 'Ada Lovelace' };
+nameBox().value = 'In flight';
+saveName().listeners.click();
+account = null;
+releaseRename();
+await flush();
+assert.equal(renameCalls.length, 1);
+assert.equal(renameCalls.includes('join'), false);
 
 console.log('discussion room tests passed');

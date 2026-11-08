@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { validateGame } from './game-record.mjs';
+import { sanitizeProfileImage } from './profile-image.mjs';
 import { createSupabaseAuth } from './supabase-auth.mjs';
 
 const SESSION_COOKIE = '__Host-chess_session';
@@ -80,6 +81,9 @@ function publicError(error) {
     'Join Chess before doing that.',
     'A discussion message must be 1 to 1000 characters.',
     'You can discuss only as your own Chess profile.',
+    'You can edit only your own Chess profile.',
+    'A bio can be at most 280 characters.',
+    'Use a JPEG, PNG, or WebP image up to 512 KB.',
     'Sign in before joining Chess.',
     'Sign in before doing that.',
     'Enter a display name of 1 to 40 characters.',
@@ -114,6 +118,17 @@ function publicError(error) {
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
   return 'The request could not be completed.';
+}
+
+async function readBounded(req, max) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > max) throw new Error('Use a JPEG, PNG, or WebP image up to 512 KB.');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 async function readJson(req) {
@@ -212,6 +227,23 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       }
       const profileMatch = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})$/i);
       const authorPosts = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/posts$/i);
+      const profileImage = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/(portrait|background)$/i);
+      if (req.method === 'GET' && profileImage) {
+        const result = await query('select mime, bytes from chess_service.profile_image($1, $2)', [profileImage[1], profileImage[2]]);
+        const image = result.rows[0];
+        if (!image || !image.bytes || !['image/jpeg', 'image/png', 'image/webp'].includes(image.mime)) {
+          return send(404, { error: 'That profile was not found.' });
+        }
+        res.writeHead(200, {
+          'content-type': image.mime,
+          'content-length': image.bytes.length,
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+          'referrer-policy': 'no-referrer'
+        });
+        res.end(image.bytes);
+        return;
+      }
       if (req.method === 'GET' && profileMatch) {
         const result = await query('select chess_service.profile($1) as profile', [profileMatch[1]]);
         if (!result.rows[0].profile) return send(404, { error: 'That profile was not found.' });
@@ -300,7 +332,27 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       const sessionCheck = await query('select chess_service.chess_session($1) as session', [token]);
       if (!sessionCheck.rows[0].session.authenticated) return send(401, { error: 'Sign in before doing that.' });
       if (!(await csrfOk(req, token))) return send(403, { error: 'The security token did not match this session.' });
+      if (url.pathname === '/api/profile/portrait' || url.pathname === '/api/profile/background') {
+        const kind = url.pathname.endsWith('portrait') ? 'portrait' : 'background';
+        const authorId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.headers['x-chess-profile'] || ''))
+          ? String(req.headers['x-chess-profile'])
+          : null;
+        const raw = await readBounded(req, 524288);
+        if (!raw.length) {
+          await query('select chess_service.clear_profile_image($1, $2, $3)', [token, authorId, kind]);
+          return send(200, { cleared: true });
+        }
+        const declared = String(req.headers['content-type'] || '');
+        const image = sanitizeProfileImage(raw, declared);
+        await query('select chess_service.set_profile_image($1, $2, $3, $4, $5)', [token, authorId, kind, image.type, image.bytes]);
+        return send(200, { saved: true, mime: image.type });
+      }
       const body = await readJson(req);
+      if (url.pathname === '/api/profile/bio') {
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const result = await query('select chess_service.set_profile_bio($1, $2, $3) as profile', [token, authorId, body.bio]);
+        return send(200, result.rows[0].profile);
+      }
       if (url.pathname === '/api/logout') {
         await query('select chess_service.chess_logout($1)', [token]);
         return send(200, { authenticated: false }, { 'set-cookie': clearCookies() });
@@ -310,7 +362,8 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/profile/rename') {
-        const result = await query('select chess_service.chess_rename($1, $2) as profile', [token, body.displayName]);
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const result = await query('select chess_service.chess_rename($1, $2, $3) as profile', [token, authorId, body.displayName]);
         return send(200, result.rows[0].profile);
       }
       if (url.pathname === '/api/discussion') {

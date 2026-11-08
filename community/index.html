@@ -40,8 +40,12 @@
 <main class="page" id="main">
   <p class="eyebrow">Shared posts</p>
   <h1>Community</h1>
-  <p class="lead">A small place for signed-in display names, posts, and replies.</p>
-  <p><a href="/community/discussion/">Discussion</a> is the one conversation for everyone who has joined Chess.</p>
+  <p class="lead">Sign in, then click Join Chess. Posts, replies, and your profile stay on Chess.</p>
+  <nav class="community-entries" aria-label="Community places">
+    <a class="entry" href="/community/discussion/"><strong>Discussion</strong><span>One conversation for everyone who has joined Chess. You can read it before joining. Posting requires Join Chess.</span></a>
+  </nav>
+  <div id="your-profile-slot"></div>
+  <p id="community-state" class="community-status">Checking whether you are signed in.</p>
   <noscript><p>Community sign-in needs JavaScript. No posts are shown.</p></noscript>
   <div id="community-app"></div>
   <nav class="page-nav" aria-label="Related">
