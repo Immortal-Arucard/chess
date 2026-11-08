@@ -74,6 +74,8 @@ function publicError(error) {
     'Sign-in could not start.',
     'Sign-in could not be completed.',
     'Sign-in expired.',
+    'The account service could not send a sign-in link.',
+    'Google sign-in could not start.',
     'This account is suspended.',
     'Join Chess before doing that.',
     'Sign in before joining Chess.',
@@ -211,39 +213,45 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, { posts: result.rows[0].posts, limit });
       }
       if (req.method === 'GET' && url.pathname === '/api/auth/callback') {
-        const state = cookieValue(req.headers.cookie, STATE_COOKIE);
-        const code = String(url.searchParams.get('code') || '');
-        const cookieState = state;
-        const fail = (status, error) => {
-          res.writeHead(status, Object.assign({
-            location: origin + '/community/',
+        const authRedirect = (notice) => {
+          res.writeHead(303, Object.assign({
+            location: origin + '/community/?auth=' + encodeURIComponent(notice),
             'set-cookie': [
               setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 }),
               setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
             ]
           }, AUTH_HEADERS));
-          res.end(JSON.stringify({ error }));
+          res.end();
         };
-        if (!state || state !== cookieState || !code) return fail(303, 'Sign-in could not be completed.');
-        const consumed = await query('select verifier, redirect_uri from chess_service.consume_auth($1)', [state]);
-        const row = consumed.rows[0];
-        if (!row || row.redirect_uri !== origin + '/api/auth/callback') return fail(303, 'Sign-in expired.');
-        const exchange = await master.exchange({ code, verifier: row.verifier });
-        if (!exchange || exchange.audience !== 'authenticated' || !exchange.masterId) return fail(303, 'Sign-in could not be completed.');
-        const sessionToken = randomToken();
-        const csrf = randomToken();
-        await query('select chess_service.complete_login($1, $2, $3)', [exchange.masterId, sessionToken, csrf]);
-        res.writeHead(303, Object.assign({
-          location: origin + '/community/',
-          'set-cookie': [
-            setCookie(SESSION_COOKIE, sessionToken, { httpOnly: true, maxAge: 60 * 60 * 12 }),
-            setCookie(CSRF_COOKIE, csrf, { httpOnly: false, maxAge: 60 * 60 * 12 }),
-            setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 }),
-            setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
-          ]
-        }, AUTH_HEADERS));
-        res.end();
-        return;
+        try {
+          if (url.searchParams.get('error')) return authRedirect('rejected');
+          const state = cookieValue(req.headers.cookie, STATE_COOKIE);
+          const code = String(url.searchParams.get('code') || '');
+          if (!state) return authRedirect('browser');
+          if (!code) return authRedirect('rejected');
+          const consumed = await query('select verifier, redirect_uri from chess_service.consume_auth($1)', [state]);
+          const row = consumed.rows[0];
+          if (!row) return authRedirect('expired');
+          if (row.redirect_uri !== origin + '/api/auth/callback') return authRedirect('rejected');
+          const exchange = await master.exchange({ code, verifier: row.verifier });
+          if (!exchange || exchange.audience !== 'authenticated' || !exchange.masterId) return authRedirect('rejected');
+          const sessionToken = randomToken();
+          const csrf = randomToken();
+          await query('select chess_service.complete_login($1, $2, $3)', [exchange.masterId, sessionToken, csrf]);
+          res.writeHead(303, Object.assign({
+            location: origin + '/community/',
+            'set-cookie': [
+              setCookie(SESSION_COOKIE, sessionToken, { httpOnly: true, maxAge: 60 * 60 * 12 }),
+              setCookie(CSRF_COOKIE, csrf, { httpOnly: false, maxAge: 60 * 60 * 12 }),
+              setCookie(STATE_COOKIE, '', { httpOnly: true, maxAge: 0 }),
+              setCookie(HANDOFF_COOKIE, '', { httpOnly: true, maxAge: 0 })
+            ]
+          }, AUTH_HEADERS));
+          res.end();
+          return;
+        } catch (err) {
+          return authRedirect('rejected');
+        }
       }
       if (req.method !== 'POST') return send(405, { error: 'Method not allowed.' });
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
@@ -259,6 +267,20 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         ]);
         await master.sendMagicLink({ email, challenge, redirectTo });
         return send(200, { sent: true }, {
+          'set-cookie': setCookie(STATE_COOKIE, state, { httpOnly: true, maxAge: 600 })
+        });
+      }
+      if (url.pathname === '/api/auth/google') {
+        const state = randomToken();
+        const verifier = randomToken();
+        const challenge = codeChallenge(verifier);
+        const redirectTo = origin + '/api/auth/callback';
+        const marker = randomToken().slice(0, 20) + '@oauth.chess.invalid';
+        await query('select chess_service.begin_sign_in($1, $2, $3, $4, $5, $6)', [
+          marker, state, verifier, challenge, redirectTo, clientIp(req)
+        ]);
+        const providerUrl = await master.startGoogle({ challenge, redirectTo });
+        return send(200, { url: providerUrl }, {
           'set-cookie': setCookie(STATE_COOKIE, state, { httpOnly: true, maxAge: 600 })
         });
       }

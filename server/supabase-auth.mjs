@@ -1,3 +1,16 @@
+export function googleAuthorizeLocation(status, location) {
+  if (status !== 302 || typeof location !== 'string') return '';
+  let url;
+  try {
+    url = new URL(location);
+  } catch (err) {
+    return '';
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return '';
+  if (url.hostname !== 'accounts.google.com') return '';
+  return url.toString();
+}
+
 function decodeJwtPayload(token) {
   const parts = String(token || '').split('.');
   if (parts.length !== 3) return null;
@@ -35,6 +48,23 @@ export function createSupabaseAuth({ url, apiKey, fetchImpl, expectedAudience = 
         }
       });
       if (!response.ok) throw new Error('The account service could not send a sign-in link.');
+    },
+    async startGoogle({ challenge, redirectTo }) {
+      const endpoint = new URL('/auth/v1/authorize', base + '/');
+      endpoint.searchParams.set('provider', 'google');
+      endpoint.searchParams.set('redirect_to', redirectTo);
+      endpoint.searchParams.set('code_challenge', challenge);
+      endpoint.searchParams.set('code_challenge_method', 's256');
+      endpoint.searchParams.set('scopes', 'email profile');
+      const response = await fetchFn(endpoint, {
+        method: 'GET',
+        headers: { apikey: apiKey },
+        cache: 'no-store',
+        redirect: 'manual'
+      });
+      const providerUrl = googleAuthorizeLocation(response.status, response.headers.get('location'));
+      if (!providerUrl) throw new Error('Google sign-in could not start.');
+      return providerUrl;
     },
     async exchange({ code, verifier }) {
       const tokenResponse = await call('/auth/v1/token?grant_type=pkce', {

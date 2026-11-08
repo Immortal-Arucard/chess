@@ -56,6 +56,19 @@ export function createChessGateway() {
       const body = await response.json();
       if (!response.ok || body.sent !== true) throw new Error(body.error || 'Sign-in could not start.');
     },
+    async continueWithGoogle() {
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json', origin: location.origin },
+        body: '{}'
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.url !== 'string' || !body.url.startsWith('https://accounts.google.com/')) {
+        throw new Error(typeof body.error === 'string' ? body.error : 'Google sign-in could not start.');
+      }
+      window.location.assign(body.url);
+    },
     async signOut() {
       await send('/api/logout');
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }

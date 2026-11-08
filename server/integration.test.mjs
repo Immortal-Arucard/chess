@@ -92,6 +92,7 @@ function jwt(payload) {
 function startMaster() {
   const challenges = new Map();
   const tokens = new Map();
+  const control = { authorize: 'google' };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://master.local');
     const chunks = [];
@@ -103,9 +104,41 @@ function startMaster() {
         res.end('{"error":"bearer"}');
         return;
       }
+      if (body.email === 'fail@example.test') {
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end('{"msg":"provider rejected"}');
+        return;
+      }
       challenges.set(body.code_challenge, { email: body.email, redirect: url.searchParams.get('redirect_to'), used: false });
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end('{}');
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/auth/v1/authorize') {
+      if (req.headers.authorization || url.searchParams.get('provider') !== 'google' || url.searchParams.get('code_challenge_method') !== 's256') {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"authorize"}');
+        return;
+      }
+      if (url.searchParams.get('skip_http_redirect')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"error":"authorize does not return json"}');
+        return;
+      }
+      challenges.set(url.searchParams.get('code_challenge'), { email: 'google', redirect: url.searchParams.get('redirect_to'), used: false });
+      const locations = {
+        google: 'https://accounts.google.com/o/oauth2/v2/auth?state=test',
+        evil: 'https://evil.example/phish',
+        suffix: 'https://accounts.google.com.evil.example/o/oauth2/v2/auth',
+        insecure: 'http://accounts.google.com/o/oauth2/v2/auth'
+      };
+      if (control.authorize === 'json') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ url: locations.google }));
+        return;
+      }
+      res.writeHead(302, { location: locations[control.authorize] || locations.google });
+      res.end();
       return;
     }
     if (req.method === 'POST' && url.pathname === '/auth/v1/token') {
@@ -143,7 +176,7 @@ function startMaster() {
     res.writeHead(404);
     res.end();
   });
-  return { server, challenges };
+  return { server, challenges, control };
 }
 
 function assertReleaseRollsBack() {
@@ -211,6 +244,77 @@ async function signIn(appPort, jar, masterId) {
   assert.equal(session.json.profile, null);
   assert.equal(JSON.stringify(session.json).includes(masterId), false);
 }
+
+const missingState = await request(port, cookieJar(), 'GET', '/api/auth/callback?code=missing-browser');
+assert.equal(missingState.status, 303);
+assert.equal(missingState.location, origin + '/community/?auth=browser');
+assert.equal(missingState.text.includes('eyJ'), false);
+const providerDenied = await request(port, cookieJar(), 'GET', '/api/auth/callback?error=access_denied');
+assert.equal(providerDenied.location, origin + '/community/?auth=rejected');
+const failedStart = await request(port, cookieJar(), 'POST', '/api/auth/start', { email: 'fail@example.test' });
+assert.equal(failedStart.status, 400);
+assert.equal(failedStart.json.error, 'The account service could not send a sign-in link.');
+assert.equal(failedStart.text.includes('provider rejected'), false);
+const rejectedJar = cookieJar();
+const rejectedStart = await request(port, rejectedJar, 'POST', '/api/auth/start', { email: 'reject@example.test' });
+assert.equal(rejectedStart.status, 200);
+const rejectedCallback = await request(port, rejectedJar, 'GET', '/api/auth/callback?code=not-the-issued-code');
+assert.equal(rejectedCallback.status, 303);
+assert.equal(rejectedCallback.location, origin + '/community/?auth=rejected');
+assert.equal(rejectedJar.get('__Host-chess_session'), '');
+const linkJar = cookieJar();
+const linkEmail = adaMaster + '@example.test';
+const linkStart = await request(port, linkJar, 'POST', '/api/auth/start', { email: linkEmail });
+assert.equal(linkStart.status, 200, linkStart.text);
+const savedState = linkJar.get('__Host-chess_auth');
+let linkChallenge = '';
+for (const [key, value] of master.challenges) {
+  if (value.email === linkEmail && !value.code) linkChallenge = key;
+}
+const linkCode = randomToken();
+master.challenges.get(linkChallenge).code = linkCode;
+master.challenges.get(linkChallenge).masterId = adaMaster;
+const linkOk = await request(port, linkJar, 'GET', '/api/auth/callback?code=' + encodeURIComponent(linkCode));
+assert.equal(linkOk.location, origin + '/community/');
+linkJar.store('__Host-chess_auth=' + encodeURIComponent(savedState) + '; Path=/; Secure; HttpOnly');
+const reusedLink = await request(port, linkJar, 'GET', '/api/auth/callback?code=' + encodeURIComponent(linkCode));
+assert.equal(reusedLink.location, origin + '/community/?auth=expired');
+assert.equal(reusedLink.text.includes(adaMaster), false);
+const googleJar = cookieJar();
+const googleStart = await request(port, googleJar, 'POST', '/api/auth/google', {});
+assert.equal(googleStart.status, 200, googleStart.text);
+assert.equal(googleStart.json.url.startsWith('https://accounts.google.com/'), true);
+assert.equal(JSON.stringify(googleStart.json).includes('eyJ'), false);
+let googleChallenge = '';
+for (const [key, value] of master.challenges) {
+  if (value.email === 'google' && !value.code) googleChallenge = key;
+}
+const googleCode = randomToken();
+master.challenges.get(googleChallenge).code = googleCode;
+master.challenges.get(googleChallenge).masterId = adaMaster;
+const googleCallback = await request(port, googleJar, 'GET', '/api/auth/callback?code=' + encodeURIComponent(googleCode));
+assert.equal(googleCallback.status, 303, googleCallback.text);
+assert.equal(googleCallback.location, origin + '/community/');
+assert.equal(googleCallback.text.includes(adaMaster), false);
+const googleSession = await request(port, googleJar, 'GET', '/api/session');
+assert.equal(googleSession.json.authenticated, true);
+assert.equal(googleSession.json.profile, null);
+assert.equal(JSON.stringify(googleSession.json).includes(adaMaster), false);
+await request(port, googleJar, 'POST', '/api/logout', {}, { 'x-csrf-token': googleJar.get('chess_csrf') });
+const signedOut = await request(port, googleJar, 'GET', '/api/session');
+assert.equal(signedOut.json.authenticated, false);
+for (const mode of ['evil', 'json']) {
+  master.control.authorize = mode;
+  const badGoogle = await request(port, cookieJar(), 'POST', '/api/auth/google', {});
+  assert.equal(badGoogle.status, 400, mode + ' ' + badGoogle.text);
+  assert.equal(badGoogle.json.error, 'Google sign-in could not start.');
+  assert.equal(badGoogle.text.includes('evil.example'), false);
+  assert.equal(badGoogle.text.includes('accounts.google.com'), false);
+}
+master.control.authorize = 'google';
+const joinWithoutSession = await request(port, cookieJar(), 'POST', '/api/join', { displayName: 'Nobody' });
+assert.equal(joinWithoutSession.status, 401);
+assert.equal(joinWithoutSession.text.includes('eyJ'), false);
 
 const ada = cookieJar();
 const bob = cookieJar();
