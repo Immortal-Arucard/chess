@@ -41,6 +41,7 @@ jobs:
       - run: node assets/chess/profile-picture.test.mjs
       - run: node assets/chess/author-avatar.test.mjs
       - run: node assets/chess/human-rules.test.mjs
+      - run: node assets/chess/rating.test.mjs
       - run: node server/game-record.test.mjs
       - run: node server/supabase-auth.test.mjs
       - run: node server/worker.test.mjs
@@ -84,5 +85,12 @@ jobs:
           CI: "1"
           WRANGLER_SEND_METRICS: "false"
       - run: node server/roster.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/rating.workerd.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"
+      - run: node server/rating.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome

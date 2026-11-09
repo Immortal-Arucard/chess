@@ -3,7 +3,8 @@
   flex:1 1 12rem;min-height:44px;padding:10px 12px;border-radius:12px;
   border:1px solid var(--line);background:#000;color:#fff;font:inherit
 }
-.roster-sorts{display:flex;flex-wrap:wrap;gap:8px}
+.roster-sorts{display:flex;gap:8px;align-items:center;color:#fff}
+.roster-sorts select{min-height:44px;border-radius:12px;border:1px solid var(--sky);background:#000;color:var(--sky);font:inherit;padding:0 8px}
 .roster-count{color:var(--mute);margin:0 0 8px}
 .roster-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
 .roster-row{
@@ -17,7 +18,7 @@
   display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%
 }
 .roster-ratings{
-  display:grid;grid-template-columns:repeat(5,minmax(3.4rem,auto));gap:6px 8px;flex:0 0 auto
+  display:grid;grid-template-columns:repeat(6,minmax(3.4rem,auto));gap:6px 8px;flex:0 0 auto
 }
 .roster-rating{display:flex;flex-direction:column;align-items:center;min-width:3.2rem}
 .roster-rating b{

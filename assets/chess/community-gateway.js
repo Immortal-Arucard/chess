@@ -94,7 +94,8 @@ export function createChessGateway() {
         createdAt: body.createdAt,
         bio: body.bio || '',
         hasPortrait: !!body.hasPortrait,
-        hasBackground: !!body.hasBackground
+        hasBackground: !!body.hasBackground,
+        ratings: body.ratings || null
       };
     },
     async saveProfileBio(bio, authorId) {

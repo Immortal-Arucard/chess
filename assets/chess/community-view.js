@@ -736,6 +736,13 @@ export function mountProfile(root, options) {
     const bio = el('p', 'profile-bio');
     bio.textContent = person.bio ? person.bio : 'No bio yet.';
     root.append(banner, el('h2', null, person.displayName), bio);
+    const ratings = el('div', 'profile-ratings');
+    [['bullet', 'Bullet'], ['blitz', 'Blitz'], ['rapid', 'Rapid'], ['daily', 'Daily'], ['untimed', 'Untimed'], ['puzzles', 'Puzzles']].forEach(([key, label]) => {
+      const value = person.ratings ? person.ratings[key] : null;
+      const shown = key === 'puzzles' ? (value == null ? 'Unrated' : String(value)) : String(value == null ? 0 : value);
+      ratings.append(el('p', null, label + ' ' + shown));
+    });
+    root.append(ratings);
     if (viewer && viewer.id !== person.id) {
       const challenge = document.createElement('a');
       challenge.className = 'tool';

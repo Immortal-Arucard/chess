@@ -2,6 +2,7 @@ import { Chess } from '../assets/vendor/chess.js/chess.js';
 import { mountBoard } from '../assets/chess/board.js';
 import { PALETTES, PIECE_COLORS, PIECE_STYLES, loadPrefs, pieceColors, savePrefs } from '../assets/chess/bot-prefs.js';
 import { authorChip } from '../assets/chess/author-avatar.js';
+import { formatDelta, winGain } from '../assets/chess/rating.js';
 import { createChessGateway } from '../assets/chess/community-gateway.js';
 import { closeGameStage, requestGameFullscreen, syncGameStage } from '../assets/chess/game-stage.js';
 import {
@@ -21,6 +22,8 @@ let category = 'blitz';
 let preset = '3+2';
 let custom = { minutes: 3, increment: 2, days: 3 };
 let color = 'white';
+let ratedChoice = false;
+let categoryRatings = null;
 let seat = 'w';
 let manualFlip = false;
 let pass = null;
@@ -247,7 +250,7 @@ function timePicker() {
     customButton.addEventListener('click', () => { preset = 'custom'; paint(); });
     presets.append(customButton);
   }
-  wrap.append(el('p', 'human-spec', 'Casual · ' + safeSummary()), cats, presets);
+  wrap.append(el('p', 'human-spec', (mode === 'online' ? (ratedChoice ? 'Rated' : 'Unrated') : 'Unrated') + ' · ' + safeSummary()), cats, presets);
   if (preset === 'custom' && category !== 'untimed') {
     const row = el('div', 'human-custom');
     if (category === 'daily') {
@@ -381,7 +384,7 @@ function passPlay() {
     turn: pass.game.turn() === 'w' ? 'white' : 'black'
   }, Date.now());
   if (!pass.result && live.flagged) finishPass(live.flagged === 'white' ? '0-1' : '1-0', 'timeout');
-  root.append(el('p', 'human-spec', timeSummary(pass.spec) + ' · Casual'));
+  root.append(el('p', 'human-spec', timeSummary(pass.spec) + ' · Unrated'));
   root.append(el('p', null, (pass.game.turn() === 'w' ? 'White' : 'Black') + ' to move. ' + (account && account.profile ? 'Your seat is ' + color + '.' : '')));
   if (pass.spec.baseMs != null) {
     const clocks = el('p', null, 'White ' + formatClock(live.whiteMs) + ' · Black ' + formatClock(live.blackMs));
@@ -589,6 +592,23 @@ function onlineHome() {
   historyList();
 }
 function colorPicker() {
+  const ratedBox = document.createElement('fieldset');
+  ratedBox.className = 'human-rated';
+  ratedBox.append(el('legend', null, 'Rated or unrated'));
+  const unrated = el('button', 'tool', 'Unrated');
+  unrated.type = 'button';
+  unrated.id = 'rated-off';
+  unrated.setAttribute('aria-pressed', ratedChoice ? 'false' : 'true');
+  unrated.addEventListener('click', () => { ratedChoice = false; paint(); });
+  const rated = el('button', 'tool', 'Rated');
+  rated.type = 'button';
+  rated.id = 'rated-on';
+  rated.setAttribute('aria-pressed', ratedChoice ? 'true' : 'false');
+  rated.addEventListener('click', () => { ratedChoice = true; paint(); });
+  ratedBox.append(unrated, rated, el('p', 'human-chat-note', 'Rated changes the ' + category + ' rating for both players. The other player sees this choice and cannot change it. Same-device games and aborted games stay unrated.'));
+  const mine = categoryRatings && categoryRatings[category];
+  const theirs = chosen && chosen.ratings ? chosen.ratings[category] : null;
+  ratedBox.append(el('p', null, 'Your ' + category + ' rating is ' + (mine == null ? '0' : String(mine)) + (chosen ? '. ' + chosen.displayName + ' is ' + (theirs == null ? '0' : String(theirs)) + '.' : '.')));
   const row = el('div', 'play-toolbar');
   ['white', 'black', 'random'].forEach((side) => {
     const button = el('button', 'tool', side[0].toUpperCase() + side.slice(1));
@@ -597,13 +617,13 @@ function colorPicker() {
     button.addEventListener('click', () => { color = side; paint(); });
     row.append(button);
   });
-  root.append(row, el('p', 'human-chat-note', 'Casual only. Chess does not store a rated result. The other player sees these specifications and cannot change them.'));
+  root.append(ratedBox, row);
 }
 async function createChallenge(kind) {
   const spec = control();
   const game = await post('/api/human/challenges', {
     kind, opponentId: kind === 'named' ? chosen && chosen.id : null, color, category: spec.category,
-    preset: preset === 'custom' ? 'custom' : preset, minutes: custom.minutes, increment: custom.increment, days: custom.days, rated: false
+    preset: preset === 'custom' ? 'custom' : preset, minutes: custom.minutes, increment: custom.increment, days: custom.days, rated: ratedChoice
   });
   notice = game.invite ? 'Invite link: ' + location.origin + '/human/?invite=' + game.invite : 'Challenge sent.';
   online = game;
@@ -617,7 +637,10 @@ function listBlock(title, rows, incomingList) {
 }
 function challengeCard(game, incomingList) {
   const card = el('article', 'human-card');
-  card.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel }) + ' · Casual · ' + game.creatorColor));
+  card.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel }) + ' · ' + (game.rated ? 'Rated' : 'Unrated') + ' · ' + game.creatorColor));
+  if (game.creatorRating != null) {
+    card.append(el('p', null, (game.creatorName || 'Creator') + ' ' + game.category + ' ' + game.creatorRating + (game.opponentRating != null ? ' · ' + (game.challengedName || 'Opponent') + ' ' + game.opponentRating : '')));
+  }
   const players = el('div', 'human-players');
   if (game.creatorId) players.append(authorChip(game.creatorName || 'Member', game.creatorId));
   card.append(players, el('p', null, (game.turn ? game.turn + ' to move' : game.status) + (game.dailyDays ? ' · ' + formatSpan(Date.parse(game.deadlineAt) - Date.parse(game.serverNow)) : '')));
@@ -672,7 +695,7 @@ function onlineGame() {
     clockAt: Date.parse(game.clockAt),
     turn: game.turn
   }, Date.now() - offset);
-  root.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel }) + ' · Casual'));
+  root.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel }) + ' · ' + (game.rated ? 'Rated' : 'Unrated')));
   if (reconnecting) root.append(el('p', null, 'Reconnecting…'));
   if (offlineNow()) root.append(el('p', 'community-error', 'You appear to be offline. Moves and dialogue will resume when the connection returns.'));
   if (notice) root.append(el('p', 'community-error', notice));
@@ -680,13 +703,19 @@ function onlineGame() {
   layout.dataset.chat = chatSize;
   const boardColumn = el('div', 'human-board-column');
   const players = el('div', 'human-players');
-  if (game.whiteId) players.append(playerChip(game.whiteName || 'White', game.whiteId));
+  if (game.whiteId) {
+    players.append(playerChip(game.whiteName || 'White', game.whiteId));
+    if (game.whiteRating != null) players.append(el('span', 'human-rating', String(game.whiteRating)));
+  }
   if (game.baseMs != null) {
     const whiteClock = el('span', 'human-clock' + (game.turn === 'white' ? ' is-turn' : ''), formatClock(view.whiteMs));
     whiteClock.id = 'clock-white';
     players.append(whiteClock);
   }
-  if (game.blackId) players.append(playerChip(game.blackName || 'Black', game.blackId));
+  if (game.blackId) {
+    players.append(playerChip(game.blackName || 'Black', game.blackId));
+    if (game.blackRating != null) players.append(el('span', 'human-rating', String(game.blackRating)));
+  }
   if (game.baseMs != null) {
     const blackClock = el('span', 'human-clock' + (game.turn === 'black' ? ' is-turn' : ''), formatClock(view.blackMs));
     blackClock.id = 'clock-black';
@@ -694,6 +723,16 @@ function onlineGame() {
   }
   boardColumn.append(players);
   boardColumn.append(el('p', null, game.status === 'active' ? turnName + ' to move' + (game.dailyDays ? ' · ' + formatSpan(view.dailyLeftMs) : '') : (game.result || game.status) + ' ' + (game.termination || '')));
+  if (game.rated && game.status === 'active' && game.whiteRatingBefore != null && game.blackRatingBefore != null && game.myColor) {
+    const mine = game.myColor === 'white' ? game.whiteRatingBefore : game.blackRatingBefore;
+    const theirs = game.myColor === 'white' ? game.blackRatingBefore : game.whiteRatingBefore;
+    boardColumn.append(el('p', 'human-chat-note', 'A win from these ratings changes your ' + game.category + ' rating by +' + winGain(theirs - mine) + '. The server records the change when the game ends.'));
+  }
+  if (game.whiteDelta != null || game.blackDelta != null) {
+    const change = el('p', 'human-spec', 'White ' + formatDelta(game.whiteDelta || 0) + ' · Black ' + formatDelta(game.blackDelta || 0));
+    change.id = 'rating-result';
+    boardColumn.append(change);
+  }
   const board = el('div', null);
   board.id = 'board';
   boardColumn.append(board);
@@ -851,7 +890,7 @@ function historyList() {
   root.append(el('h2', null, 'Saved games'));
   history.forEach((game) => {
     const card = el('article', 'human-card');
-    card.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel })));
+    card.append(el('p', 'human-spec', timeSummary({ category: game.category, label: game.timeLabel }) + (game.kind === 'online' ? (game.rated ? ' · Rated' : ' · Unrated') : ' · Unrated')));
     const who = el('div', 'human-players');
     if (game.opponentId) who.append(authorChip(game.opponentName, game.opponentId));
     else who.append(el('span', null, game.opponentName));
@@ -911,7 +950,15 @@ async function refreshAccount() {
       const raw = await get('/api/session');
       account = raw.authenticated ? { profile: raw.profile } : null;
     }
-    if (account && account.profile) settings = await post('/api/settings', {});
+    if (account && account.profile) {
+      settings = await post('/api/settings', {});
+      try {
+        const card = await get('/api/profiles/' + account.profile.id);
+        categoryRatings = card.ratings || null;
+      } catch (err) {
+        categoryRatings = null;
+      }
+    }
     chatSize = loadChatSize(localStorage, account && account.profile && account.profile.id);
   } catch (err) {
     account = null;
