@@ -1,4 +1,4 @@
-const CACHE = 'chess-v17';
+const CACHE = 'chess-v18';
 const ROUTES = [
   '/',
   '/theory/',
@@ -95,8 +95,16 @@ function lookup(pathname) {
   return null;
 }
 
+function revalidate(request) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const shell = path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.css') || path.endsWith('/') || ROUTES.indexOf(path) !== -1;
+  if (!shell) return request;
+  return new Request(path + url.search, { cache: 'no-cache', credentials: 'same-origin' });
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))));
   self.skipWaiting();
 });
 
@@ -105,6 +113,8 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then((clients) => Promise.all(clients.map((client) => client.postMessage({ type: 'chess-sw', cache: CACHE }))))
   );
 });
 
@@ -118,7 +128,7 @@ self.addEventListener('fetch', (event) => {
   if (!key) return;
   event.respondWith((async () => {
     try {
-      const response = await fetch(request);
+      const response = await fetch(revalidate(request));
       if (response && response.ok && response.type === 'basic' && !response.redirected) {
         const copy = response.clone();
         const cache = await caches.open(CACHE);
