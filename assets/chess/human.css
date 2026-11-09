@@ -1,0 +1,37 @@
+.human-modes{display:grid;gap:12px;margin:16px 0}
+.human-modes button,.human-card{text-align:left}
+.human-card{
+  border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:12px;background:#000;color:#e8e8e8
+}
+.human-card h3{margin:0 0 6px;color:#fff;font-size:18px}
+.human-spec{color:var(--sky);font-weight:600}
+.human-players{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:8px 0}
+.human-clock{font-variant-numeric:tabular-nums;min-width:4.5rem;color:#fff}
+.human-clock.is-turn{color:var(--sky)}
+.human-layout{display:flex;flex-direction:column;gap:12px;width:100%}
+.human-chat{border:1px solid var(--line);border-radius:16px;background:#000;min-width:0}
+.human-chat-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px}
+.human-chat-title{font-weight:700;color:#fff;margin-right:auto}
+.human-chat-icon,.human-chat-restorebar{
+  appearance:none;min-height:44px;min-width:44px;border-radius:12px;border:1px solid var(--sky);
+  background:#000;color:var(--sky);font:inherit;font-weight:700;cursor:pointer
+}
+.human-chat-restorebar{display:flex;align-items:center;gap:8px;width:100%;padding:0 12px;text-align:left}
+.human-chat-icon svg{display:block}
+.human-chat-badge{border-radius:999px;background:var(--sky);color:#000;padding:2px 8px;font-size:13px}
+.human-chat-body{display:flex;flex-direction:column;gap:8px;padding:0 8px 8px}
+.human-chat-log{max-height:14rem;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.human-chat-line{margin:0;color:#e8e8e8}
+.human-chat-note{color:var(--mute);font-size:14px;margin:0}
+.human-layout[data-chat="min"] .human-chat-body{display:none}
+.human-layout[data-chat="max"] .human-board-column{display:none}
+.human-layout[data-chat="max"] .human-chat-log{max-height:70vh}
+@media (min-width:900px){
+  .human-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(16rem,22rem);align-items:start}
+  .human-layout[data-chat="min"]{grid-template-columns:minmax(0,1fr)}
+  .human-layout[data-chat="max"]{grid-template-columns:minmax(12rem,18rem) minmax(0,1fr)}
+  .human-layout[data-chat="max"] .human-board-column{display:block}
+}
+.human-search{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.human-custom{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.human-custom input{width:5rem}

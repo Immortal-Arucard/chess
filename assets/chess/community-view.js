@@ -736,6 +736,13 @@ export function mountProfile(root, options) {
     const bio = el('p', 'profile-bio');
     bio.textContent = person.bio ? person.bio : 'No bio yet.';
     root.append(banner, el('h2', null, person.displayName), bio);
+    if (viewer && viewer.id !== person.id) {
+      const challenge = document.createElement('a');
+      challenge.className = 'tool';
+      challenge.href = '/human/?opponent=' + encodeURIComponent(person.id);
+      challenge.textContent = 'Challenge to a game';
+      root.append(challenge);
+    }
     root.append(el('p', 'community-note', 'This is a Chess community profile. It does not show an email address or any other service.'));
     if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
     if (viewer && viewer.id === person.id) {

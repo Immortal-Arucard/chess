@@ -11,6 +11,7 @@ import {
 } from '/assets/chess/bot-results.js';
 import { createEngine } from '/assets/chess/engine.js';
 import { applyUci, kingSquare, legalTargets, outcome, pieceMap, pgnFor, promotionMoves } from '/assets/chess/rules.js';
+import { closeGameStage, requestGameExit, syncGameStage } from '/assets/chess/game-stage.js';
 
 const ENGINE_URL = '/assets/vendor/stockfish/stockfish-19-lite-single.js';
 const SITE = 'https://chess.theworldgovernmentincorporated.com/bot/';
@@ -29,6 +30,13 @@ const leavePrompt = document.getElementById('leave-prompt');
 const autoBox = document.getElementById('autosave-bot');
 const autoNote = document.getElementById('autosave-note');
 const boardEl = document.getElementById('board');
+const playWhite = document.getElementById('play-white');
+const playBlack = document.getElementById('play-black');
+const replayRoot = document.getElementById('replay-board');
+const replayPanel = document.getElementById('replay-panel');
+const replayStatus = document.getElementById('replay-status');
+const savedList = document.getElementById('saved-games-list');
+const savedNote = document.getElementById('saved-games-note');
 const boardApi = mountBoard(boardEl, onSquare);
 
 const engine = createEngine(ENGINE_URL);
@@ -192,8 +200,8 @@ function render() {
     result: resultCode(state)
   });
   pgnEl.value = pending && pending.record ? pending.record.pgn : livePgn;
-  document.getElementById('play-white').setAttribute('aria-pressed', player === 'w' ? 'true' : 'false');
-  document.getElementById('play-black').setAttribute('aria-pressed', player === 'b' ? 'true' : 'false');
+  if (playWhite) playWhite.setAttribute('aria-pressed', player === 'w' ? 'true' : 'false');
+  if (playBlack) playBlack.setAttribute('aria-pressed', player === 'b' ? 'true' : 'false');
   document.getElementById('resign').disabled = phase !== 'playing';
   document.body.dataset.phase = phase;
   windowEl.hidden = phase === 'setup';
@@ -214,6 +222,20 @@ function render() {
   }
   const summary = names();
   document.getElementById('game-summary').textContent = summary.white + ' vs ' + summary.black + '. Bot limit ' + prefs.elo + ', an uncalibrated engine target.';
+  if (phase === 'setup') closeGameStage();
+  else syncGameStage({
+    label: phase === 'playing' ? 'Leave game' : 'Exit',
+    confirm: phase === 'playing' ? 'Leave this unfinished game? There is no finished result to save.' : '',
+    yesLabel: 'Leave game',
+    onConfirm: () => {
+      if (unsavedFinished()) {
+        notice = 'This finished game is still unsaved. Save it to the Chess account or discard it before leaving. Leaving is blocked so the moves are not dropped.';
+        render();
+        return;
+      }
+      returnToSetup();
+    }
+  });
   setupStatus.textContent = notice && phase === 'setup'
     ? notice
     : 'Choose a color, bot limit, and appearance, then start the game. Pieces stay where they are until you start.';
@@ -488,6 +510,7 @@ function returnToSetup() {
   manualResult = null;
   pending = null;
   phase = 'setup';
+  closeGameStage();
   chess = freshChess();
   startFen = chess.fen();
   placeBoard(false);
@@ -593,12 +616,12 @@ engine.on((type, detail) => {
   rememberDevice();
 });
 
-document.getElementById('play-white').addEventListener('click', () => {
+playWhite.addEventListener('click', () => {
   if (phase !== 'setup') return;
   player = 'w';
   render();
 });
-document.getElementById('play-black').addEventListener('click', () => {
+playBlack.addEventListener('click', () => {
   if (phase !== 'setup') return;
   player = 'b';
   render();
@@ -642,8 +665,7 @@ choiceButtons(document.getElementById('piece-color-choices'), PIECE_COLORS, pref
 });
 
 document.getElementById('start-game').addEventListener('click', startGame);
-document.getElementById('new-game').addEventListener('click', () => askLeave('new'));
-document.getElementById('exit-game').addEventListener('click', () => askLeave('exit'));
+document.getElementById('new-game').addEventListener('click', () => requestGameExit());
 document.getElementById('leave-cancel').addEventListener('click', () => {
   leavePrompt.hidden = true;
   leaveAction = '';
@@ -704,12 +726,8 @@ document.addEventListener('keydown', (event) => {
     render();
     return;
   }
-  if (event.key === 'Escape' && phase !== 'setup') {
-    askLeave('exit');
-    return;
-  }
   if (event.key !== 'Tab' || windowEl.hidden) return;
-  const nodes = [...windowEl.querySelectorAll('button, textarea, a, input')].filter((el) => !el.disabled && !el.closest('[hidden]'));
+  const nodes = [...document.querySelectorAll('#game-window button, #game-window textarea, #game-window a, #game-window input, .game-exitbar button')].filter((el) => !el.disabled && !el.closest('[hidden]') && !el.closest('[inert]'));
   if (!nodes.length) return;
   const first = nodes[0];
   const last = nodes[nodes.length - 1];
@@ -760,23 +778,20 @@ if (recovered && recovered.phase !== 'setup') {
     placeBoard(false);
   }
 }
-syncAccountSettings();
-render();
 let replayGame = null;
 let replayIndex = 0;
 let replayStart = '';
-const replayBoard = mountBoard(document.getElementById('replay-board'), () => {});
+const replayBoard = mountBoard(replayRoot, () => {});
 function openReplay(game) {
   if (phase === 'playing' || (phase === 'ended' && pending && pending.status !== 'saved')) {
-    const note = document.getElementById('saved-games-note');
-    if (note) note.textContent = 'Finish or discard the game on the board before replaying a saved game.';
+    if (savedNote) savedNote.textContent = 'Finish or discard the game on the board before replaying a saved game.';
     return;
   }
   replayGame = new Chess();
   replayGame.loadPgn(game.pgn);
   replayStart = game.startFen;
   replayIndex = replayGame.history().length;
-  document.getElementById('replay-panel').hidden = false;
+  replayPanel.hidden = false;
   showReplay();
 }
 function showReplay() {
@@ -796,7 +811,7 @@ function showReplay() {
     lastMove: null,
     interactive: false
   });
-  document.getElementById('replay-status').textContent = replayIndex === 0
+  replayStatus.textContent = replayIndex === 0
     ? 'Starting position.'
     : 'Move ' + replayIndex + ': ' + moves[replayIndex - 1];
 }
@@ -809,14 +824,14 @@ document.getElementById('replay-next').addEventListener('click', () => {
   showReplay();
 });
 document.getElementById('replay-close').addEventListener('click', () => {
-  document.getElementById('replay-panel').hidden = true;
+  replayPanel.hidden = true;
   replayGame = null;
   replayIndex = 0;
 });
 
 async function loadSavedGames(cursor) {
-  const list = document.getElementById('saved-games-list');
-  const note = document.getElementById('saved-games-note');
+  const list = savedList;
+  const note = savedNote;
   if (!list || !note) return;
   if (!cursor) list.replaceChildren();
   if (!accountState.id) {
@@ -857,6 +872,8 @@ async function loadSavedGames(cursor) {
   }
 }
 
+syncAccountSettings();
+render();
 void refreshAccount();
 engine.start();
 autoBox.addEventListener('change', () => {

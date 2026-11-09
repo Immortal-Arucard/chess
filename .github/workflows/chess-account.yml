@@ -40,6 +40,7 @@ jobs:
       - run: node server/profile-image.test.mjs
       - run: node assets/chess/profile-picture.test.mjs
       - run: node assets/chess/author-avatar.test.mjs
+      - run: node assets/chess/human-rules.test.mjs
       - run: node server/game-record.test.mjs
       - run: node server/supabase-auth.test.mjs
       - run: node server/worker.test.mjs
@@ -66,5 +67,15 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: node server/author-avatar.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/human-match.workerd.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"
+      - run: node server/human.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/game-stage.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome
