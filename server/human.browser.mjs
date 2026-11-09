@@ -103,6 +103,22 @@ try {
     document.querySelector('#board [data-square="e4"]').click();
   });
   await page.waitForFunction(() => document.body.innerText.includes('e4'), { timeout: 10000 });
+  const passChrome = await page.evaluate(() => ({
+    header: !!document.querySelector('header.site-header'),
+    footer: !!document.querySelector('footer.site-footer'),
+    sections: !!document.querySelector('nav.page-nav'),
+    crumbs: !!document.querySelector('nav.crumbs'),
+    skip: !!document.querySelector('a.skip'),
+    title: !!document.querySelector('h1'),
+    lead: !!document.querySelector('p.lead')
+  }));
+  assert.equal(passChrome.header, false);
+  assert.equal(passChrome.footer, false);
+  assert.equal(passChrome.sections, false);
+  assert.equal(passChrome.crumbs, false);
+  assert.equal(passChrome.skip, false);
+  assert.equal(passChrome.title, false);
+  assert.equal(passChrome.lead, false);
   await shot(page, 'human_game_desktop.png');
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await shot(page, 'human_game_phone.png');
@@ -153,6 +169,25 @@ try {
   await minaPage.evaluate(() => document.getElementById('chat-send').click());
   await minaPage.waitForFunction(() => document.getElementById('chat-body') && document.getElementById('chat-body').value === '');
   await julianPage.waitForFunction(() => document.body.innerText.includes('Good evening.'));
+  const onlineChrome = await julianPage.evaluate(() => ({
+    header: !!document.querySelector('header.site-header'),
+    footer: !!document.querySelector('footer.site-footer'),
+    sections: !!document.querySelector('nav.page-nav'),
+    crumbs: !!document.querySelector('nav.crumbs'),
+    skip: !!document.querySelector('a.skip'),
+    title: !!document.querySelector('h1'),
+    links: document.querySelectorAll('.human-players a, #game-chat a').length,
+    chips: [...document.querySelectorAll('.author-chip')].map((node) => node.tagName)
+  }));
+  assert.equal(onlineChrome.header, false);
+  assert.equal(onlineChrome.footer, false);
+  assert.equal(onlineChrome.sections, false);
+  assert.equal(onlineChrome.crumbs, false);
+  assert.equal(onlineChrome.skip, false);
+  assert.equal(onlineChrome.title, false);
+  assert.equal(onlineChrome.links, 0);
+  assert.ok(onlineChrome.chips.length >= 2);
+  assert.ok(onlineChrome.chips.every((tag) => tag === 'SPAN'));
   await julianPage.evaluate(() => document.querySelector('#game-chat [title="Minimize"]').click());
   await julianPage.waitForFunction(() => document.querySelector('#game-chat [title="Restore"]'));
   const minimized = await julianPage.$eval('#game-chat', (node) => ({
@@ -175,6 +210,26 @@ try {
   await julianPage.waitForSelector('[title="Maximize"]');
   await shot(julianPage, 'human_online_phone.png');
   await shot(minaPage, 'human_online_desktop.png');
+  await julianPage.goBack();
+  await julianPage.waitForFunction(() => document.body.innerText.includes('It will be aborted'));
+  assert.equal(await julianPage.evaluate(() => !!document.querySelector('header.site-header')), false);
+  await julianPage.evaluate(() => document.getElementById('leave-no').click());
+  await julianPage.waitForFunction(() => document.getElementById('game-chat') && !document.querySelector('header.site-header'));
+  await minaPage.evaluate(() => document.getElementById('draw').click());
+  await julianPage.waitForSelector('#decline-draw', { timeout: 10000 });
+  await julianPage.evaluate(() => document.getElementById('decline-draw').click());
+  await minaPage.waitForFunction(() => {
+    const button = document.getElementById('draw');
+    return button && button.textContent === 'Offer draw';
+  }, { timeout: 10000 });
+  await minaPage.mouse.move(120, 280);
+  await minaPage.mouse.move(120, 4);
+  await minaPage.waitForFunction(() => document.body.classList.contains('exit-revealed'));
+  await shot(minaPage, 'human_online_exit_desktop.png');
+  await julianPage.mouse.move(40, 280);
+  await julianPage.mouse.move(40, 3);
+  await julianPage.waitForFunction(() => document.body.classList.contains('exit-revealed'));
+  await shot(julianPage, 'human_online_exit_phone.png');
   console.log('human browser tests passed');
 } finally {
   await browser.close();

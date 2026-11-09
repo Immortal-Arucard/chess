@@ -124,7 +124,7 @@ export async function handleHumanPost({ url, token, body, query, send }) {
     if (!game || game.status !== 'active') throw new Error('That game was not found.');
     if (Number(body.version) !== Number(game.version)) throw new Error('The board changed. Reload this game.');
     if (game.myColor !== game.turn) throw new Error('It is not your turn.');
-    const played = playSan(game.sans || [], body.san);
+    const played = playSan(game.sans || [], body.san, game.startFen);
     const end = played.outcome.over ? played.outcome : { result: null, termination: null };
     const result = await query('select chess_service.human_move($1, $2, $3, $4, $5, $6, $7) as game', [
       token, authorId, id, Number(body.version), played.san, end.result, end.termination || null

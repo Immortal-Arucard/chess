@@ -33,6 +33,16 @@ assert.equal(threefold.outcome.termination, 'threefold');
 
 const flagged = clockView({ category: 'bullet', baseMs: 60000, whiteMs: 1000, blackMs: 60000, clockAt: 0, turn: 'white' }, 1500);
 assert.equal(flagged.flagged, 'white');
+const exact = clockView({ category: 'blitz', baseMs: 180000, whiteMs: 0, blackMs: 180000, clockAt: 1000, turn: 'white' }, 1000);
+assert.equal(exact.flagged, 'white');
+assert.equal(exact.whiteMs, 0);
+const dailyExact = clockView({ category: 'daily', dailyDays: 1, deadlineAt: 5000, turn: 'white' }, 5000);
+assert.equal(dailyExact.flagged, 'white');
+const checkCastle = playSan([], 'O-O', '5k2/8/8/8/8/8/8/4K2R w K - 0 1');
+assert.equal(checkCastle.san, 'O-O+');
+const mateCastle = playSan([], 'O-O-O', '3k4/3Q4/8/8/8/8/8/R3K3 w Q - 0 1');
+assert.equal(mateCastle.san, 'O-O-O#');
+assert.equal(mateCastle.outcome.termination, 'checkmate');
 const daily = clockView({ category: 'daily', dailyDays: 1, deadlineAt: 5000, turn: 'black' }, 1000);
 assert.equal(daily.dailyLeftMs, 4000);
 assert.equal(formatClock(65000), '1:05');

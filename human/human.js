@@ -3,6 +3,7 @@ import { mountBoard } from '../assets/chess/board.js';
 import { PALETTES, PIECE_COLORS, PIECE_STYLES, loadPrefs, pieceColors, savePrefs } from '../assets/chess/bot-prefs.js';
 import { authorChip } from '../assets/chess/author-avatar.js';
 import { createChessGateway } from '../assets/chess/community-gateway.js';
+import { closeGameStage, requestGameFullscreen, syncGameStage } from '../assets/chess/game-stage.js';
 import {
   CATEGORIES, STANDARD_FEN, chatControls, cleanChatBody, clockView, formatClock, formatSpan, loadChatSize, outcome,
   piecesOf, playSan, replaySans, kingSquare, resolveTimeControl, saveChatSize, timeSummary, unreadCount
@@ -91,6 +92,58 @@ function restoreIcon() {
   return svg;
 }
 
+function playerChip(name, id) {
+  return authorChip(name, id, { linked: false });
+}
+function inGame() {
+  return (mode === 'pass-play' && pass) || (mode === 'online-game' && online);
+}
+function stageOptions() {
+  if (mode === 'online-game' && online && online.status === 'active') {
+    const moves = (online.sans || []).length;
+    const id = online.id;
+    const version = online.version;
+    return {
+      label: 'Leave game',
+      confirm: moves
+        ? 'Leave this game? You resign, and the other player wins.'
+        : 'Leave this game? It will be aborted, and neither player gets a result.',
+      yesLabel: moves ? 'Resign' : 'Abort game',
+      onConfirm: () => run(async () => {
+        if (moves) await post('/api/human/resign', { id, version });
+        else await post('/api/human/abort', { id });
+        mode = 'online';
+        online = null;
+        notice = '';
+        paint();
+        refreshOnline();
+      })
+    };
+  }
+  if (mode === 'pass-play' && pass && !pass.result) {
+    return {
+      label: 'Leave game',
+      confirm: 'Leave this game? The moves on this device will be discarded.',
+      yesLabel: 'Leave game',
+      onConfirm: () => { pass = null; mode = 'home'; notice = ''; paint(); }
+    };
+  }
+  if (mode === 'pass-play' && pass && pass.result && !pass.saved) {
+    return {
+      label: 'Exit',
+      confirm: '',
+      onConfirm: () => { notice = 'Save or discard the finished game first.'; paint(); }
+    };
+  }
+  return {
+    label: 'Exit',
+    confirm: '',
+    onConfirm: () => {
+      if (mode === 'online-game') { mode = 'online'; online = null; paint(); refreshOnline(); }
+      else { pass = null; mode = 'home'; paint(); }
+    }
+  };
+}
 function home() {
   root.append(el('p', null, 'Same-device games work without a connection. Online games need two Chess accounts.'));
   if (notice) root.append(el('p', 'community-error', notice));
@@ -352,20 +405,28 @@ function passPlay() {
   resign.type = 'button';
   resign.id = 'resign';
   resign.addEventListener('click', () => finishPass(pass.game.turn() === 'w' ? '0-1' : '1-0', 'resign'));
-  const draw = el('button', 'tool', pass.offer ? 'Accept draw' : 'Offer draw');
-  draw.type = 'button';
-  draw.id = 'draw';
-  draw.addEventListener('click', () => {
-    if (pass.offer && pass.offer !== (pass.game.turn() === 'w' ? 'white' : 'black')) finishPass('1/2-1/2', 'agreement');
-    else { pass.offer = pass.game.turn() === 'w' ? 'white' : 'black'; paint(); }
-  });
-  if (!over) root.append(flip, resign, draw);
+  if (!over) {
+    root.append(flip, resign);
+    if (pass.offer) {
+      const accept = el('button', 'tool', 'Accept draw');
+      accept.type = 'button';
+      accept.id = 'draw';
+      accept.addEventListener('click', () => finishPass('1/2-1/2', 'agreement'));
+      const decline = el('button', 'tool', 'Decline draw');
+      decline.type = 'button';
+      decline.id = 'decline-draw';
+      decline.addEventListener('click', () => { pass.offer = null; paint(); });
+      root.append(accept, decline);
+    } else {
+      const draw = el('button', 'tool', 'Offer draw');
+      draw.type = 'button';
+      draw.id = 'draw';
+      draw.addEventListener('click', () => { pass.offer = pass.game.turn() === 'w' ? 'white' : 'black'; paint(); });
+      root.append(draw);
+    }
+  }
   root.append(el('ol', 'moves', pass.sans.join(' ')));
   if (over) endPanel();
-  const exit = el('button', 'tool', 'Exit');
-  exit.type = 'button';
-  exit.addEventListener('click', () => { if (pass.result && !pass.saved) { notice = 'Save or discard the finished game first.'; paint(); return; } pass = null; mode = 'home'; paint(); });
-  root.append(exit);
   promotionBox(onPassSquare);
 }
 
@@ -563,7 +624,7 @@ function challengeCard(game, incomingList) {
   if (incomingList) {
     const accept = el('button', 'tool', 'Accept');
     accept.type = 'button';
-    accept.addEventListener('click', () => run(async () => openGame(await post('/api/human/accept', { id: game.id }))));
+    accept.addEventListener('click', () => { requestGameFullscreen(); run(async () => openGame(await post('/api/human/accept', { id: game.id }))); });
     const decline = el('button', 'tool', 'Decline');
     decline.type = 'button';
     decline.addEventListener('click', () => run(async () => { await post('/api/human/decline', { id: game.id }); await refreshOnline(); }));
@@ -576,12 +637,12 @@ function challengeCard(game, incomingList) {
   } else if (game.status === 'open' && game.kind === 'public') {
     const claim = el('button', 'tool', 'Claim');
     claim.type = 'button';
-    claim.addEventListener('click', () => run(async () => openGame(await post('/api/human/accept', { id: game.id }))));
+    claim.addEventListener('click', () => { requestGameFullscreen(); run(async () => openGame(await post('/api/human/accept', { id: game.id }))); });
     card.append(claim);
   } else if (game.status === 'active') {
     const open = el('button', 'tool', 'Open');
     open.type = 'button';
-    open.addEventListener('click', () => run(async () => openGame(await get('/api/human/games/' + game.id))));
+    open.addEventListener('click', () => { requestGameFullscreen(); run(async () => openGame(await get('/api/human/games/' + game.id))); });
     card.append(open);
   }
   return card;
@@ -619,13 +680,13 @@ function onlineGame() {
   layout.dataset.chat = chatSize;
   const boardColumn = el('div', 'human-board-column');
   const players = el('div', 'human-players');
-  if (game.whiteId) players.append(authorChip(game.whiteName || 'White', game.whiteId));
+  if (game.whiteId) players.append(playerChip(game.whiteName || 'White', game.whiteId));
   if (game.baseMs != null) {
     const whiteClock = el('span', 'human-clock' + (game.turn === 'white' ? ' is-turn' : ''), formatClock(view.whiteMs));
     whiteClock.id = 'clock-white';
     players.append(whiteClock);
   }
-  if (game.blackId) players.append(authorChip(game.blackName || 'Black', game.blackId));
+  if (game.blackId) players.append(playerChip(game.blackName || 'Black', game.blackId));
   if (game.baseMs != null) {
     const blackClock = el('span', 'human-clock' + (game.turn === 'black' ? ' is-turn' : ''), formatClock(view.blackMs));
     blackClock.id = 'clock-black';
@@ -636,7 +697,7 @@ function onlineGame() {
   const board = el('div', null);
   board.id = 'board';
   boardColumn.append(board);
-  const local = replaySans(game.sans || []);
+  const local = replaySans(game.sans || [], game.startFen);
   const interactive = game.status === 'active' && game.myColor === game.turn && !offlineNow();
   mountBoard(board, onOnlineSquare).render({
     orientation: game.myColor === 'black' ? 'b' : 'w',
@@ -656,11 +717,24 @@ function onlineGame() {
     resign.type = 'button';
     resign.id = 'resign';
     resign.addEventListener('click', () => run(async () => openGame(await post('/api/human/resign', { id: game.id, version: game.version }))));
-    const draw = el('button', 'tool', game.drawOffer && game.drawOffer !== game.myColor ? 'Accept draw' : 'Offer draw');
-    draw.type = 'button';
-    draw.id = 'draw';
-    draw.addEventListener('click', () => run(async () => openGame(await post('/api/human/draw', { id: game.id, version: game.version, action: game.drawOffer && game.drawOffer !== game.myColor ? 'accept' : 'offer' }))));
-    boardColumn.append(resign, draw);
+    boardColumn.append(resign);
+    if (game.drawOffer && game.drawOffer !== game.myColor) {
+      const accept = el('button', 'tool', 'Accept draw');
+      accept.type = 'button';
+      accept.id = 'draw';
+      accept.addEventListener('click', () => run(async () => openGame(await post('/api/human/draw', { id: game.id, version: game.version, action: 'accept' }))));
+      const decline = el('button', 'tool', 'Decline draw');
+      decline.type = 'button';
+      decline.id = 'decline-draw';
+      decline.addEventListener('click', () => run(async () => openGame(await post('/api/human/draw', { id: game.id, version: game.version, action: 'decline' }))));
+      boardColumn.append(accept, decline);
+    } else if (!game.drawOffer) {
+      const draw = el('button', 'tool', 'Offer draw');
+      draw.type = 'button';
+      draw.id = 'draw';
+      draw.addEventListener('click', () => run(async () => openGame(await post('/api/human/draw', { id: game.id, version: game.version, action: 'offer' }))));
+      boardColumn.append(draw);
+    } else boardColumn.append(el('p', null, 'Draw offered.'));
     if (!(game.sans || []).length) {
       const abort = el('button', 'tool', 'Abort');
       abort.type = 'button';
@@ -671,14 +745,10 @@ function onlineGame() {
   boardColumn.append(el('ol', 'moves', (game.sans || []).join(' ')));
   layout.append(boardColumn, chatPanel(game, mineId));
   root.append(layout);
-  const back = el('button', 'tool', 'Back');
-  back.type = 'button';
-  back.addEventListener('click', () => { mode = 'online'; online = null; paint(); refreshOnline(); });
-  root.append(back);
 }
 function onOnlineSquare(square) {
   if (!online || online.myColor !== online.turn) return;
-  const game = replaySans(online.sans || []);
+  const game = replaySans(online.sans || [], online.startFen);
   if (selected) {
     const choices = game.moves({ square: selected, verbose: true }).filter((move) => move.to === square);
     if (choices.length === 1) {
@@ -739,7 +809,7 @@ function chatPanel(game, mineId) {
   log.id = 'chat-log';
   (game.messages || []).forEach((message) => {
     const line = el('p', 'human-chat-line');
-    if (message.authorId) line.append(authorChip(message.authorName || 'Member', message.authorId));
+    if (message.authorId) line.append(playerChip(message.authorName || 'Member', message.authorId));
     line.append(el('span', null, ' ' + message.body));
     log.append(line);
   });
@@ -826,6 +896,8 @@ function paint() {
   else if (mode === 'online') onlineHome();
   else if (mode === 'online-game' && online) onlineGame();
   else home();
+  if (inGame()) syncGameStage(stageOptions());
+  else closeGameStage();
 }
 async function run(action) {
   try { notice = ''; await action(); }

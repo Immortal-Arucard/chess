@@ -103,10 +103,13 @@ export function forgetAuthorPortrait(id) {
   if (index !== -1) recent.splice(index, 1);
 }
 
-export function authorChip(name, id) {
-  const link = document.createElement('a');
+export function authorChip(name, id, options) {
+  const linked = !options || options.linked !== false;
+  const link = document.createElement(linked ? 'a' : 'span');
   link.className = 'author-chip';
-  link.href = profilePath(id);
+  if (linked) link.href = profilePath(id);
+  else link.setAttribute('role', 'group');
+  if (!linked) link.setAttribute('aria-label', name || 'Member');
   const avatar = document.createElement('span');
   avatar.className = 'author-avatar is-pending';
   avatar.setAttribute('aria-hidden', 'true');

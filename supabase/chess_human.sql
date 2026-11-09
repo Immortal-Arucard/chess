@@ -205,6 +205,7 @@ begin
     'rated', false,
     'iAmRecording', recording,
     'invite', case when actor = match.creator_id then match.invite else null end,
+    'startFen', match.start_fen,
     'serverNow', clock_timestamp(),
     'createdAt', match.created_at
   );
@@ -359,7 +360,7 @@ begin
     elsif match.base_ms is not null and match.clock_at is not null then
       elapsed := greatest(0, floor(extract(epoch from (clock_timestamp() - match.clock_at)) * 1000))::integer;
       remaining := case when side = 'white' then match.white_ms else match.black_ms end - elapsed;
-      if remaining < 0 then
+      if remaining <= 0 then
         perform chess_private.human_finish(match.id, case when side = 'white' then '0-1' else '1-0' end, 'timeout');
       end if;
     end if;
@@ -453,7 +454,7 @@ begin
     case when creator_color = 'white' then actor else null end,
     case when creator_color = 'black' then actor else null end,
     case when kind = 'named' then opponent else null end,
-    'rnbqkbnr/pppppppp/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     base_ms, coalesce(increment_ms, 0), base_ms, base_ms, daily_days, coalesce(record_chat, false)
   ) returning * into match;
   return chess_private.human_project(match, actor);
@@ -657,7 +658,7 @@ begin
   if expected is distinct from actor then
     raise exception 'You can play only as your own Chess profile.';
   end if;
-  if san is null or san !~ '^(O-O-O|O-O|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?[+#]?)$' then
+  if san is null or san !~ '^((O-O-O|O-O)[+#]?|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?[+#]?)$' then
     raise exception 'That move is not legal.';
   end if;
   if next_result is not null and next_result not in ('1-0', '0-1', '1/2-1/2') then
@@ -684,7 +685,7 @@ begin
   if match.base_ms is not null then
     elapsed := greatest(0, floor(extract(epoch from (clock_timestamp() - match.clock_at)) * 1000))::integer;
     remaining := case when side = 'white' then match.white_ms else match.black_ms end - elapsed;
-    if remaining < 0 then
+    if remaining <= 0 then
       match := chess_private.human_finish(match.id, case when side = 'white' then '0-1' else '1-0' end, 'timeout');
       return chess_private.human_project(match, actor) || jsonb_build_object('messages', chess_private.human_dialogue(match.id));
     end if;

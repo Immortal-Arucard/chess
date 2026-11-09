@@ -267,7 +267,13 @@ try {
   const savedText = await page.$eval('#save-status', (el) => el.textContent);
   if (!savedText.includes('Saved')) throw new Error(savedText);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.querySelector('#saved-games-list button'));
+  await page.waitForFunction(() => document.body.dataset.phase === 'ended' && document.getElementById('leave-game'));
+  await page.evaluate(() => {
+    const bar = document.querySelector('.game-exitbar');
+    if (bar) bar.removeAttribute('inert');
+    document.getElementById('leave-game').click();
+  });
+  await page.waitForFunction(() => document.querySelector('.site-header') && document.querySelector('#saved-games-list button'));
   await page.evaluate(() => document.querySelector('#saved-games-list button').click());
   await page.waitForFunction(() => document.querySelectorAll('#replay-board .square').length === 64);
   const squares = await page.$$eval('#replay-board .square', (nodes) => nodes.length);
@@ -295,9 +301,7 @@ try {
   await page.waitForSelector('input[type=email]');
   await signIn('bob@example.test', 'Bob Stone', bobMaster);
   await page.goto(origin + '/bot/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#save-account');
-  await page.evaluate(() => document.getElementById('save-account').click());
-  await page.waitForFunction(() => document.getElementById('end-panel').innerText.includes('different Chess account'));
+  await page.waitForFunction(() => document.body.dataset.phase === 'setup' && document.querySelector('header.site-header') && document.getElementById('game-window').hidden);
   const bobList = await page.$eval('#saved-games-list', (el) => el.textContent);
   if (bobList.includes('Replay')) throw new Error('the other account listed the first game');
   await page.screenshot({ path: join(shotDir, 'browser-account-switch.png') });

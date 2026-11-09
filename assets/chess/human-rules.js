@@ -175,7 +175,7 @@ export function clockView(state, nowMs) {
     return {
       whiteMs: null,
       blackMs: null,
-      flagged: left < 0 ? state.turn : null,
+      flagged: left <= 0 ? state.turn : null,
       dailyLeftMs: left < 0 ? 0 : left
     };
   }
@@ -184,8 +184,8 @@ export function clockView(state, nowMs) {
   let blackMs = Number(state.blackMs);
   if (state.turn === 'white') whiteMs -= elapsed;
   if (state.turn === 'black') blackMs -= elapsed;
-  if (state.turn === 'white' && whiteMs < 0) return { whiteMs: 0, blackMs, flagged: 'white', dailyLeftMs: null };
-  if (state.turn === 'black' && blackMs < 0) return { whiteMs, blackMs: 0, flagged: 'black', dailyLeftMs: null };
+  if (state.turn === 'white' && whiteMs <= 0) return { whiteMs: 0, blackMs, flagged: 'white', dailyLeftMs: null };
+  if (state.turn === 'black' && blackMs <= 0) return { whiteMs, blackMs: 0, flagged: 'black', dailyLeftMs: null };
   return { whiteMs, blackMs, flagged: null, dailyLeftMs: null };
 }
 
