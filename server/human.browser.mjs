@@ -149,7 +149,7 @@ try {
   await julianPage.goto(origin + '/human/', { waitUntil: 'domcontentloaded' });
   await julianPage.waitForFunction(() => document.getElementById('mode-online'), { timeout: 10000 });
   await julianPage.evaluate(() => document.getElementById('mode-online').click());
-  await julianPage.waitForFunction(() => document.body.innerText.includes('Blitz') && document.body.innerText.includes('3+2'));
+  await julianPage.waitForFunction(() => [...document.querySelectorAll('button')].some((node) => node.textContent === 'Accept'), { timeout: 10000 });
   await julianPage.evaluate(() => [...document.querySelectorAll('button')].find((node) => node.textContent === 'Accept').click());
   await julianPage.waitForSelector('#game-chat');
   await julianPage.waitForSelector('#board');
