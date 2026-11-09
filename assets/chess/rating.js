@@ -58,3 +58,18 @@ export function formatDelta(delta) {
   if (value > 0) return '+' + value;
   return String(value);
 }
+
+export function puzzleScore(kind, userRating, puzzleRating, streakBefore) {
+  const user = Number(userRating);
+  const puzzle = Number(puzzleRating);
+  const streak = Math.max(0, Number(streakBefore) || 0);
+  if (kind === 'abandoned') return { gain: 0, bonus: 0, delta: 0, after: user, streakAfter: streak };
+  if (kind === 'solved') {
+    const gain = winGain(puzzle - user);
+    const bonus = streak;
+    return { gain, bonus, delta: gain + bonus, after: user + gain + bonus, streakAfter: streak + 1 };
+  }
+  const loss = winGain(user - puzzle) + 1;
+  const after = Math.max(0, user - loss);
+  return { gain: 0, bonus: 0, delta: after - user, after, streakAfter: 0, loss };
+}

@@ -16,7 +16,8 @@ const SORTS = [
   ['blitz', 'Blitz rating'],
   ['rapid', 'Rapid rating'],
   ['daily', 'Daily rating'],
-  ['untimed', 'Untimed rating']
+  ['untimed', 'Untimed rating'],
+  ['puzzles', 'Puzzle rating']
 ];
 
 let query = '';

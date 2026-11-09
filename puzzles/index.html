@@ -16,7 +16,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
-
+<link rel="stylesheet" href="/assets/chess/board.css">
+<link rel="stylesheet" href="/assets/chess/community.css">
+<link rel="stylesheet" href="/assets/chess/puzzle.css">
 </head>
 <body class="sheet">
 <a class="skip" href="#main">Skip to content</a>
@@ -37,23 +39,43 @@
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Chess puzzles</span></li></ol></nav>
 <main class="page" id="main">
-  <p class="eyebrow">Planned. Not operational.</p>
+  <p class="eyebrow">Puzzles</p>
   <h1>Chess puzzles</h1>
+  <p class="lead">Solve the line. A signed-in puzzle rating starts at 0.</p>
   <div class="prose">
-    <p>This page is reserved for chess puzzles on this site.</p>
-    <p>No positions or solutions are published here. The page is planned and is not operational.</p>
+    <p>These puzzles are a subset of the Lichess Open Puzzle Database, published under CC0. Each puzzle keeps its own rating. Your rating and streak change only after a signed-in solve or a wrong move. Leaving before a wrong move is abandoned and stays unrated.</p>
   </div>
+  <form id="setup" class="puzzle-order">
+    <label>Order
+      <select id="puzzle-order">
+        <option value="weakest">Weakest to strongest</option>
+        <option value="tier">100-point tiers, random inside each</option>
+        <option value="random">Fully random</option>
+      </select>
+    </label>
+    <label>Minimum rating
+      <input id="puzzle-min" inputmode="numeric" autocomplete="off">
+    </label>
+    <label>Maximum rating
+      <input id="puzzle-max" inputmode="numeric" autocomplete="off">
+    </label>
+    <label>Starting tier
+      <input id="puzzle-tier" inputmode="numeric" autocomplete="off">
+    </label>
+    <button type="button" class="tool" id="puzzle-save-order">Save order</button>
+  </form>
+  <div id="puzzle-app"></div>
   <nav class="page-nav" aria-label="Sections">
   <h2>Sections</h2>
   <ul class="children">
     <li class="child"><a href="/theory/"><strong>Taoist Aristo-Platonic Post-Hypermodernism</strong><span>Planned. Not operational.</span></a></li>
-<li class="child"><a href="/human/"><strong>Human versus human</strong><span>Play a person on this device or online.</span></a></li>
-<li class="child"><a href="/bot/"><strong>Bot chess</strong><span>Play a standard game against a bot.</span></a></li>
-<li class="child"><a href="/puzzles/" aria-current="page"><strong>Chess puzzles</strong><span>This page</span></a></li>
-<li class="child"><a href="/analysis/"><strong>Game analysis</strong><span>Planned. Not operational.</span></a></li>
-<li class="child"><a href="/community/"><strong>Community</strong><span>Sign in, then click Join Chess.</span></a></li>
-<li class="child"><a href="/marketplace/"><strong>Marketplace</strong><span>Planned. Not operational.</span></a></li>
-<li class="child"><a href="/exchange/"><strong>Exchange</strong><span>Planned. Not operational.</span></a></li>
+    <li class="child"><a href="/human/"><strong>Human versus human</strong><span>Play a person on this device or online.</span></a></li>
+    <li class="child"><a href="/bot/"><strong>Bot chess</strong><span>Play a standard game against a bot.</span></a></li>
+    <li class="child"><a href="/puzzles/" aria-current="page"><strong>Chess puzzles</strong><span>This page</span></a></li>
+    <li class="child"><a href="/analysis/"><strong>Game analysis</strong><span>Planned. Not operational.</span></a></li>
+    <li class="child"><a href="/community/"><strong>Community</strong><span>Sign in, then click Join Chess.</span></a></li>
+    <li class="child"><a href="/marketplace/"><strong>Marketplace</strong><span>Planned. Not operational.</span></a></li>
+    <li class="child"><a href="/exchange/"><strong>Exchange</strong><span>Planned. Not operational.</span></a></li>
   </ul>
 </nav>
 </main>
@@ -68,5 +90,6 @@
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <script src="/assets/site.js"></script>
+<script type="module" src="/puzzles/puzzle.js"></script>
 </body>
 </html>

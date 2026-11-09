@@ -1,0 +1,5 @@
+The puzzles in lichess-open-subset.json and practice.json are a vetted subset of the Lichess Open Puzzle Database.
+Source: https://database.lichess.org/lichess_db_puzzle.csv.zst
+License: CC0. Puzzle ratings in that database are unchanged here.
+The rated pool is loaded once with: node server/seed-puzzles.mjs
+practice.json is the signed-out offline pack and is not part of the rated pool.

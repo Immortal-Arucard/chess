@@ -38,7 +38,7 @@ psql(db, `
   create schema if not exists extensions;
   create extension if not exists pgcrypto schema extensions;
 `);
-['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql'].forEach((file) => psqlFile(db, file));
+['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql'].forEach((file) => psqlFile(db, file));
 psql(db, `
   alter role chess_server login password '${password}';
   grant connect on database ${db} to chess_server;
@@ -80,7 +80,7 @@ try {
   assert.equal(all.json.ratingSort, false);
   assert.deepEqual(all.json.members.map((member) => member.displayName), ['Julian Park', 'Mina Chen', 'Nora <b>Ellison</b>']);
   all.json.members.forEach((member) => {
-    assert.deepEqual(member.ratings, { bullet: 0, blitz: 0, rapid: 0, daily: 0, untimed: 0, puzzles: null });
+    assert.deepEqual(member.ratings, { bullet: 0, blitz: 0, rapid: 0, daily: 0, untimed: 0, puzzles: 0 });
     assert.equal(typeof member.hasPortrait, 'boolean');
     assert.equal(member.email, undefined);
     assert.equal(member.ownerId, undefined);
@@ -115,7 +115,7 @@ try {
   assert.equal(withRating.json.members[0].ratings.rapid, 0);
   assert.equal(withRating.json.members[0].ratings.daily, 0);
   assert.equal(withRating.json.members[0].ratings.untimed, 0);
-  assert.equal(withRating.json.members[0].ratings.puzzles, null);
+  assert.equal(withRating.json.members[0].ratings.puzzles, 0);
   const byBlitz = await call(worker, '/api/community/roster?sort=blitz');
   assert.equal(byBlitz.json.ratingSort, true);
   assert.equal(byBlitz.json.sort, 'blitz');

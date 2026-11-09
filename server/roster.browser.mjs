@@ -14,9 +14,9 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const mina = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const julian = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const nora = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
-const empty = { bullet: 0, blitz: 0, rapid: 0, daily: 0, untimed: 0, puzzles: null };
+const empty = { bullet: 0, blitz: 0, rapid: 0, daily: 0, untimed: 0, puzzles: 0 };
 const members = [
-  { id: julian, displayName: 'Julian Park', hasPortrait: false, ratings: { bullet: 1510, blitz: 1602, rapid: 1488, daily: 1400, untimed: 900, puzzles: null } },
+  { id: julian, displayName: 'Julian Park', hasPortrait: false, ratings: { bullet: 1510, blitz: 1602, rapid: 1488, daily: 1400, untimed: 900, puzzles: 1320 } },
   { id: mina, displayName: 'Mina Chen', hasPortrait: true, ratings: empty },
   { id: nora, displayName: 'Nora <b>Ellison</b> with a very long display name', hasPortrait: false, ratings: empty }
 ];
@@ -115,8 +115,8 @@ try {
   ]);
   assert.equal(desktop.markup, false);
   assert.match(desktop.text, /Nora <b>Ellison<\/b>/);
-  assert.deepEqual(desktop.scores, ['1510', '1602', '1488', '1400', '900', '\u2014']);
-  assert.deepEqual(desktop.labels, ['1510', '1602', '1488', '1400', '900', 'Unrated']);
+  assert.deepEqual(desktop.scores, ['1510', '1602', '1488', '1400', '900', '1320']);
+  assert.deepEqual(desktop.labels, ['1510', '1602', '1488', '1400', '900', '1320']);
   assert.ok(desktop.ratingsRight <= desktop.width + 1);
   assert.equal(await page.$eval('#roster-sort', (node) => [...node.options].some((option) => option.value === 'untimed' && !option.disabled)), true);
   assert.equal(desktop.count, '3 accounts');

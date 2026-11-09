@@ -1,0 +1,11 @@
+.puzzle-streak { color: var(--sky); font-variant-numeric: tabular-nums; }
+.puzzle-spec, .puzzle-outcome { margin: 8px 0; }
+.puzzle-review { display: grid; gap: 12px; margin-top: 12px; }
+.puzzle-line { margin: 0; padding-left: 1.2em; }
+.puzzle-line .is-current { color: var(--sky); font-weight: 700; }
+.puzzle-order { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
+.puzzle-order label { display: flex; flex-direction: column; gap: 4px; color: var(--sky); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.puzzle-order input, .puzzle-order select { min-height: 44px; font: inherit; color: inherit; background: #000; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; }
+@media (min-width: 800px) {
+  .puzzle-review { grid-template-columns: 1fr 1fr; }
+}

@@ -48,7 +48,7 @@ psql(db, `
   create schema if not exists extensions;
   create extension if not exists pgcrypto schema extensions;
 `);
-['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql'].forEach((file) => psqlFile(db, file));
+['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql'].forEach((file) => psqlFile(db, file));
 psql(db, `alter role chess_server login password '${password}'; grant connect on database ${db} to chess_server; ${seed(mina)} ${seed(julian)}`);
 assert.equal(psql(db, "select chess_private.win_gain(151);"), String(winGain(151)));
 assert.equal(psql(db, "select chess_private.win_gain(-151);"), String(winGain(-151)));
@@ -212,12 +212,12 @@ try {
   const roster = await call(worker, null, 'GET', '/api/community/roster?sort=blitz');
   assert.equal(roster.json.ratingSort, true);
   assert.equal(roster.json.members.find((member) => member.id === mina.profile).ratings.blitz, 1491);
-  assert.equal(roster.json.members.find((member) => member.id === mina.profile).ratings.puzzles, null);
+  assert.equal(roster.json.members.find((member) => member.id === mina.profile).ratings.puzzles, 0);
   assert.equal(roster.text.includes(mina.master), false);
   const profile = await call(worker, null, 'GET', '/api/profiles/' + mina.profile);
   assert.equal(profile.json.ratings.blitz, 1491);
   assert.equal(profile.json.ratings.untimed > 0, true);
-  assert.equal(profile.json.ratings.puzzles, null);
+  assert.equal(profile.json.ratings.puzzles, 0);
   assert.equal(profile.text.includes(mina.master), false);
   console.log('rating workerd tests passed');
 } finally {

@@ -173,6 +173,24 @@ export function createChessGateway() {
     async deletePost(id) { await send('/api/posts/delete', { id }); },
     async deleteReply(id) { await send('/api/replies/delete', { id }); },
     async report(input) { await send('/api/reports', input); },
+    async puzzleAttempts(cursor) {
+      const params = new URLSearchParams();
+      params.set('limit', '10');
+      if (cursor && cursor.id) {
+        params.set('before', cursor.finishedAt);
+        params.set('beforeId', cursor.id);
+      }
+      const response = await fetch('/api/puzzles/attempts?' + params.toString(), { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Puzzle history could not be loaded.');
+      return { attempts: body.attempts || [], next: body.next || null };
+    },
+    async puzzleAttempt(id) {
+      const response = await fetch('/api/puzzles/attempts/' + encodeURIComponent(id), { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'That puzzle attempt was not found.');
+      return body;
+    },
     listen() {}
   };
 }
