@@ -1,4 +1,4 @@
-const CACHE = 'chess-v19';
+const CACHE = 'chess-v20';
 const ROUTES = [
   '/',
   '/theory/',
@@ -122,11 +122,23 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+const REDIRECTS = {
+  '/discussion': '/community/discussion/',
+  '/discussion/': '/community/discussion/',
+  '/roster': '/community/roster/',
+  '/roster/': '/community/roster/'
+};
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  const redirectTo = REDIRECTS[url.pathname];
+  if (redirectTo) {
+    event.respondWith(Response.redirect(new URL(redirectTo, self.location.origin).href, 301));
+    return;
+  }
   if (url.pathname.startsWith('/api/')) return;
   const key = lookup(url.pathname);
   if (!key) return;

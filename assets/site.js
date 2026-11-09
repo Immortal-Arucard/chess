@@ -58,9 +58,14 @@
             { href: 'self:/bot/', name: 'Bot chess' },
             { href: 'self:/puzzles/', name: 'Chess puzzles' },
             { href: 'self:/analysis/', name: 'Game analysis' },
-            { href: 'self:/community/', name: 'Community' },
-            { href: 'self:/community/discussion/', name: 'Discussion' },
-            { href: 'self:/community/roster/', name: 'Roster' },
+            {
+              href: 'self:/community/',
+              name: 'Community',
+              children: [
+                { href: 'self:/community/discussion/', name: 'Discussion' },
+                { href: 'self:/community/roster/', name: 'Roster' }
+              ]
+            },
             { href: 'self:/marketplace/', name: 'Marketplace' },
             { href: 'self:/exchange/', name: 'Exchange' }
           ]
@@ -169,10 +174,10 @@
 })();
 
 function startAccountMenu() {
-  import('/assets/chess/account-menu.js?v=19').catch(function () { /* the header stays usable without the account control */ });
+  import('/assets/chess/account-menu.js?v=20').catch(function () { /* the header stays usable without the account control */ });
 }
 var sectionRegistry = document.createElement('script');
-sectionRegistry.src = '/assets/account-sections.js?v=19';
+sectionRegistry.src = '/assets/account-sections.js?v=20';
 sectionRegistry.onload = startAccountMenu;
 sectionRegistry.onerror = startAccountMenu;
 document.body.appendChild(sectionRegistry);

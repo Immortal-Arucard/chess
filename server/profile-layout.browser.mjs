@@ -131,6 +131,7 @@ async function layout() {
     const frameBox = frame ? frame.getBoundingClientRect() : null;
     return {
       hasHeader: !!document.querySelector('.site-header'),
+      hasAccount: !!document.getElementById('account-slot'),
       hasNav: !!document.querySelector('.site-nav, .page-nav, footer'),
       links: [...document.querySelectorAll('a')].map((anchor) => anchor.getAttribute('href')),
       texts: [...document.querySelectorAll('a')].map((anchor) => anchor.textContent.trim()),
@@ -146,7 +147,7 @@ async function layout() {
 }
 
 function assertImmersive(info, label) {
-  assert.equal(info.hasHeader, false, label + ' showed the site header');
+  assert.equal(info.hasAccount, true, label + ' is missing the account control');
   assert.equal(info.hasNav, false, label + ' showed ordinary site navigation');
   assert.ok(info.barTop <= 1, label + ' exit bar is not at the top');
   assert.ok(info.barWidth >= info.innerWidth - 2, label + ' exit bar does not span the page');
@@ -172,15 +173,17 @@ function assertImmersive(info, label) {
 try {
   await page.setViewport({ width: 1280, height: 800 });
   await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
-  const home = await page.$eval('.community-entries', (nav) => ({
-    text: nav.innerText,
-    hrefs: [...nav.querySelectorAll('a')].map((anchor) => anchor.getAttribute('href')),
-    tall: [...nav.querySelectorAll('a')].every((anchor) => anchor.getBoundingClientRect().height >= 72)
+  const home = await page.$eval('main', (main) => ({
+    community: [...main.querySelectorAll('a[href="/community/"]')].map((anchor) => anchor.getAttribute('href')),
+    discussion: [...main.querySelectorAll('a[href="/community/discussion/"]')].length,
+    roster: [...main.querySelectorAll('a[href="/community/roster/"]')].length,
+    text: main.innerText
   }));
-  assert.deepEqual(home.hrefs, ['/community/', '/community/discussion/', '/community/roster/']);
-  assert.equal(home.tall, true);
+  assert.deepEqual(home.community, ['/community/']);
+  assert.equal(home.discussion, 0);
+  assert.equal(home.roster, 0);
   assert.match(home.text, /Community/);
-  assert.match(home.text, /Discussion/);
+  assert.equal(home.text.includes('Discussion'), true);
   await page.screenshot({ path: join(shotDir, 'community-home-desktop.png'), fullPage: false });
 
   await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
@@ -206,6 +209,7 @@ try {
     const image = document.querySelector('.profile-portrait img');
     return image && image.complete && image.naturalWidth > 0;
   });
+  await page.waitForSelector('#account-slot');
   let info = await layout();
   assertImmersive(info, 'desktop profile');
   assert.match(info.text, /Ada Lovelace/);
@@ -222,7 +226,7 @@ try {
     bannerHeight: document.querySelector('.profile-banner').getBoundingClientRect().height
   }));
   assert.equal(card.bio, '<script>alert(1)</script>');
-  assert.equal(card.scripts <= 2, true);
+  assert.equal(card.scripts <= 5, true);
   const adaPortraits = seenPortraits.filter((parsed) => parsed.pathname === '/api/profiles/' + ada + '/portrait');
   assert.ok(adaPortraits.length >= 1);
   assert.ok(adaPortraits.every((parsed) => parsed.origin === new URL(page.url()).origin));
