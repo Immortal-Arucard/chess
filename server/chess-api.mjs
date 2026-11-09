@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { validateGame } from './game-record.mjs';
+import { handleHumanGet, handleHumanPost } from './human-api.mjs';
 import { sanitizeProfileImage } from './profile-image.mjs';
 import { createSupabaseAuth } from './supabase-auth.mjs';
 
@@ -113,7 +114,24 @@ function publicError(error) {
     'The request origin is not this Chess site.',
     'The security token did not match this session.',
     'That profile was not found.',
-    'This account has reached the saved-game limit.'
+    'This account has reached the saved-game limit.',
+    'That time control is not available.',
+    'Choose white, black, or random.',
+    'Choose a Chess member to challenge.',
+    'You cannot claim your own challenge.',
+    'That challenge is no longer open.',
+    'It is not your turn.',
+    'That move is not legal.',
+    'That game was not found.',
+    'The board changed. Reload this game.',
+    'You can play only as your own Chess profile.',
+    'You can abort only before the first move.',
+    'That draw offer is not open.',
+    'A dialogue message must be 1 to 500 characters.',
+    'You can write in this game only as a player.',
+    'This dialogue is already saved with your game.',
+    'Enter at least 2 characters of a display name.',
+    'You already have too many open challenges.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
@@ -307,6 +325,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
           return authRedirect('rejected');
         }
       }
+      if (req.method === 'GET' && url.pathname.startsWith('/api/human')) {
+        const human = await handleHumanGet({ url, token, query, send });
+        if (human !== false) return;
+      }
       if (req.method !== 'POST') return send(405, { error: 'Method not allowed.' });
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
       if (url.pathname === '/api/auth/start') {
@@ -412,9 +434,13 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].hidden);
       }
       if (url.pathname === '/api/settings') {
-        const result = body.autoSaveBotResults === undefined
-          ? await query('select chess_service.chess_settings($1) as settings', [token])
-          : await query('select chess_service.chess_settings_set($1, $2) as settings', [token, body.autoSaveBotResults === true]);
+        if (body.autoSaveBotResults !== undefined) {
+          await query('select chess_service.chess_settings_set($1, $2) as settings', [token, body.autoSaveBotResults === true]);
+        }
+        if (body.autoRecordHumanChat !== undefined) {
+          await query('select chess_service.human_record_setting_set($1, $2) as settings', [token, body.autoRecordHumanChat === true]);
+        }
+        const result = await query('select chess_service.chess_settings($1) as settings', [token]);
         return send(200, result.rows[0].settings);
       }
       if (url.pathname === '/api/games') {
@@ -422,6 +448,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         if (!body.expectedProfileId) throw new Error('This game belongs to a different Chess account.');
         const result = await query('select chess_service.save_game($1, $2::jsonb, $3) as saved', [token, JSON.stringify(body), hash]);
         return send(200, result.rows[0].saved);
+      }
+      if (url.pathname.startsWith('/api/human')) {
+        const human = await handleHumanPost({ url, token, body, query, send });
+        if (human !== false) return;
       }
       if (url.pathname === '/api/games/list') {
         const result = await query('select chess_service.game_page($1, $2, $3, $4) as games', [

@@ -120,6 +120,7 @@ const worker = {
       await client.query('begin');
       try {
         await client.query('select chess_service.chess_cleanup()');
+        await client.query('select chess_service.human_expire()');
         await client.query('commit');
       } catch (err) {
         try { await client.query('rollback'); } catch (ignore) { /* rollback failed */ }
