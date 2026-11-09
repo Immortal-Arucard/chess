@@ -66,7 +66,7 @@ psql(db, `
   create schema if not exists extensions;
   create extension if not exists pgcrypto schema extensions;
 `);
-['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql'].forEach((file) => psqlFile(db, file));
+['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql', 'supabase/chess_puzzle_serial.sql'].forEach((file) => psqlFile(db, file));
 psql(db, `alter role chess_server login password '${password}'; grant connect on database ${db} to chess_server; ${seed(mina)} ${seed(julian)}`);
 insertPack();
 let denied = false;
@@ -246,6 +246,41 @@ try {
   assert.ok(!roster.text.includes(mina.master));
   const profile = await call(worker, null, 'GET', '/api/profiles/' + mina.profile);
   assert.equal(profile.json.ratings.puzzles, rating);
+
+  const summonedRow = catalog.find((row) => row.moves.length >= 4 && !byId[row.id]);
+  byId[summonedRow.id] = summonedRow;
+  psql(db, `insert into chess_private.puzzles (id, fen, moves, themes, rating, practice, serial) values ('${summonedRow.id}', '${summonedRow.fen}', array[${summonedRow.moves.map((move) => "'" + move + "'").join(',')}]::text[], '{}', ${summonedRow.rating}, false, 1042);`);
+  const ratingBefore = psql(db, `select rating from chess_private.profile_ratings where profile_id = '${mina.profile}' and category = 'puzzles';`);
+  const streakBefore = psql(db, `select puzzle_streak from chess_private.account_settings where profile_id = '${mina.profile}';`);
+  const summoned = await call(worker, mina, 'POST', '/api/puzzles/summon', { serial: 1042 });
+  assert.equal(summoned.status, 200, summoned.text);
+  assert.equal(summoned.json.attempt.summoned, true);
+  assert.equal(summoned.json.attempt.serial, 1042);
+  assert.equal(summoned.json.attempt.lichessId, summonedRow.id);
+  const summonedDone = await solve(worker, mina, summoned.json.attempt);
+  assert.equal(summonedDone.json.status, 'solved');
+  assert.equal(summonedDone.json.summoned, true);
+  assert.equal(summonedDone.json.delta, 0);
+  assert.equal(summonedDone.json.bonus, 0);
+  assert.equal(String(summonedDone.json.streakAfter), streakBefore);
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${mina.profile}' and category = 'puzzles';`), ratingBefore);
+  assert.equal(psql(db, `select puzzle_streak from chess_private.account_settings where profile_id = '${mina.profile}';`), streakBefore);
+  const summonedHistory = await call(worker, mina, 'GET', '/api/puzzles/attempts?limit=5');
+  const summonedItem = summonedHistory.json.attempts.find((item) => item.serial === 1042);
+  assert.equal(summonedItem.summoned, true);
+  assert.equal(summonedItem.delta, 0);
+  const missing = await call(worker, mina, 'POST', '/api/puzzles/summon', { serial: 999999 });
+  assert.equal(missing.status, 400);
+  assert.equal(missing.json.error, 'That puzzle was not found.');
+
+  const forced = await call(worker, mina, 'POST', '/api/puzzles/next', {});
+  assert.equal(forced.json.exhausted, false, forced.text);
+  psql(db, `update chess_private.puzzle_attempts set summoned = true where id = '${forced.json.attempt.attemptId}';`);
+  const forcedDone = await solve(worker, mina, forced.json.attempt);
+  assert.equal(forcedDone.json.summoned, true);
+  assert.equal(forcedDone.json.delta, 0);
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${mina.profile}' and category = 'puzzles';`), ratingBefore);
+  assert.equal(psql(db, `select puzzle_streak from chess_private.account_settings where profile_id = '${mina.profile}';`), streakBefore);
   console.log('puzzle workerd tests passed');
 } finally {
   await worker.stop();

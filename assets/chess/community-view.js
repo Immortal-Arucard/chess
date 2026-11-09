@@ -663,6 +663,7 @@ export function mountProfile(root, options) {
   let openAttempt = null;
 
   function puzzleChange(item) {
+    if (item.summoned) return 'Unrated (summoned)';
     if (item.status === 'abandoned') return 'Unrated';
     if (item.status === 'solved') {
       const bonus = Number(item.bonus) || 0;
@@ -685,7 +686,7 @@ export function mountProfile(root, options) {
     if (!attempts.length) section.append(el('p', null, 'No puzzle attempts yet.'));
     attempts.forEach((item) => {
       const block = el('article', 'puzzle-attempt');
-      const button = el('button', 'tool', 'Puzzle ' + item.puzzleId + ' · ' + item.puzzleRating + ' · ' + puzzleStatus(item.status) + ' · ' + puzzleChange(item) + ' · streak ' + item.streakBefore);
+      const button = el('button', 'tool', (item.serial ? '#' + item.serial + ' · ' : '') + 'Puzzle ' + item.puzzleId + ' · ' + item.puzzleRating + ' · ' + (item.summoned ? 'Unrated (summoned)' : puzzleStatus(item.status)) + ' · ' + puzzleChange(item) + ' · streak ' + item.streakBefore);
       button.type = 'button';
       button.addEventListener('click', () => {
         if (openAttempt && openAttempt.attemptId === item.id) {
@@ -696,6 +697,13 @@ export function mountProfile(root, options) {
         load(async () => { openAttempt = await gateway.puzzleAttempt(item.id); });
       });
       block.append(button);
+      if (item.serial) {
+        const open = document.createElement('a');
+        open.className = 'tool';
+        open.href = '/puzzles/?serial=' + encodeURIComponent(item.serial);
+        open.textContent = 'Open #' + item.serial;
+        block.append(open);
+      }
       if (openAttempt && openAttempt.attemptId === item.id) {
         (openAttempt.played || []).forEach((move) => {
           const seconds = ((Number(move.millis) || 0) / 1000).toFixed(1);

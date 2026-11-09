@@ -69,6 +69,7 @@ function seconds(millis) {
 }
 function resultLine(attempt) {
   if (!attempt || attempt.status === 'active') return '';
+  if (attempt.summoned) return 'Unrated (summoned). This puzzle does not change your rating or streak.';
   if (attempt.status === 'abandoned') return 'Abandoned. Unrated. Your rating and streak stay the same.';
   if (attempt.status === 'solved') {
     const gain = Number(attempt.gain) || 0;
@@ -113,6 +114,30 @@ function boardState(interactive) {
     pieceColors: pieceColors(prefs.pieceColor)
   };
 }
+function serialLine() {
+  const row = el('p', 'puzzle-serial');
+  row.append(el('span', null, puzzle.serial ? 'Puzzle #' + puzzle.serial : 'Puzzle ' + puzzle.puzzleId));
+  if (puzzle.serial) {
+    const copy = el('button', 'tool', 'Copy');
+    copy.type = 'button';
+    copy.id = 'puzzle-copy';
+    copy.addEventListener('click', () => { void copySerial(); });
+    row.append(copy);
+  }
+  row.append(el('span', null, ' Lichess ' + (puzzle.lichessId || puzzle.puzzleId)));
+  if (puzzle.summoned) row.append(el('span', null, ' Unrated (summoned).'));
+  return row;
+}
+async function copySerial() {
+  const value = String(puzzle.serial);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(value);
+    notice = 'Copied puzzle #' + value;
+  } catch (err) {
+    notice = 'Puzzle #' + value;
+  }
+  paint();
+}
 function tracker() {
   const box = el('p', 'puzzle-streak');
   const streak = puzzle && puzzle.streak != null ? puzzle.streak : summary.streak;
@@ -147,8 +172,9 @@ function paint() {
     syncStage();
     return;
   }
+  root.append(serialLine());
   const spec = el('p', 'puzzle-spec');
-  spec.textContent = 'Puzzle ' + puzzle.puzzleId + ' · rating ' + puzzle.puzzleRating + (account ? '' : ' · practice');
+  spec.textContent = 'Rating ' + puzzle.puzzleRating + (account ? '' : ' · practice');
   root.append(spec);
   const outcome = el('p', 'puzzle-outcome', resultLine(puzzle));
   outcome.id = 'puzzle-outcome';
@@ -323,6 +349,62 @@ function applyServer(body) {
   loadPosition(attempt);
   phase = attempt.status === 'active' ? 'play' : 'play';
 }
+function showPractice(row, summoned) {
+  const attempt = {
+    attemptId: null,
+    puzzleId: row.id,
+    lichessId: row.id,
+    serial: row.serial || null,
+    puzzleRating: row.rating,
+    themes: row.themes || [],
+    setupFen: row.fen,
+    applied: [row.moves[0]],
+    status: 'active',
+    summoned: !!summoned,
+    played: [],
+    line: row.moves,
+    cursor: 1,
+    movedAt: Date.now(),
+    solution: null,
+    userRating: 0,
+    streak: 0,
+    best: 0
+  };
+  loadPosition(attempt);
+  phase = 'play';
+  notice = summoned ? 'Unrated (summoned). This puzzle does not change your rating or streak.' : '';
+  paint();
+}
+async function summon(raw) {
+  const serial = Number(String(raw || '').trim().replace(/^#/, ''));
+  if (!Number.isInteger(serial) || serial < 1) {
+    notice = 'Enter a puzzle number.';
+    paint();
+    return;
+  }
+  if (!account) {
+    const row = practice.find((item) => item.serial === serial);
+    if (!row) {
+      notice = 'That puzzle was not found.';
+      paint();
+      return;
+    }
+    showPractice(row, true);
+    return;
+  }
+  busy = true;
+  paint();
+  try {
+    const body = await post('/api/puzzles/summon', { serial });
+    applyServer(body);
+    notice = 'Unrated (summoned). This puzzle does not change your rating or streak.';
+  } catch (err) {
+    notice = err.message || 'That puzzle was not found.';
+    phase = 'home';
+  }
+  busy = false;
+  paint();
+}
 async function begin() {
   notice = '';
   if (!account) return beginPractice();
@@ -346,26 +428,7 @@ function beginPractice() {
   }
   const row = practice[practiceCursor % practice.length];
   practiceCursor += 1;
-  const attempt = {
-    attemptId: null,
-    puzzleId: row.id,
-    puzzleRating: row.rating,
-    themes: row.themes || [],
-    setupFen: row.fen,
-    applied: [row.moves[0]],
-    status: 'active',
-    played: [],
-    line: row.moves,
-    cursor: 1,
-    movedAt: Date.now(),
-    solution: null,
-    userRating: 0,
-    streak: 0,
-    best: 0
-  };
-  loadPosition(attempt);
-  phase = 'play';
-  paint();
+  showPractice(row, false);
 }
 async function leave() {
   if (account && puzzle && puzzle.attemptId && puzzle.status === 'active') {
@@ -432,6 +495,8 @@ async function saveOrder() {
 async function boot() {
   const save = document.getElementById('puzzle-save-order');
   if (save) save.addEventListener('click', () => { void saveOrder(); });
+  const go = document.getElementById('puzzle-go');
+  if (go) go.addEventListener('click', () => { void summon(document.getElementById('puzzle-serial').value); });
   try {
     const session = await gateway.profile();
     account = session ? { profile: session } : null;
@@ -464,7 +529,9 @@ async function boot() {
       notice = err.message || '';
     }
   }
-  paint();
+  const requested = new URLSearchParams(window.location.search).get('serial');
+  if (requested) await summon(requested);
+  else paint();
   window.addEventListener('pagehide', () => {
     if (!account || !puzzle || puzzle.status !== 'active' || !puzzle.attemptId) return;
     fetch('/api/puzzles/abandon', {

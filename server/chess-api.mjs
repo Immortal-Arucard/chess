@@ -136,7 +136,8 @@ function publicError(error) {
     'You already have too many open challenges.',
     'That puzzle order is not available.',
     'That puzzle range is not available.',
-    'That puzzle attempt was not found.'
+    'That puzzle attempt was not found.',
+    'That puzzle was not found.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;

@@ -19,9 +19,9 @@ export function puzzleInsertSql(file, practice) {
     const values = rows.slice(index, index + 400).map((row) => {
       const themes = (row.themes || []).filter((theme) => /^[A-Za-z0-9]+$/.test(theme));
       const moves = row.moves.filter((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move));
-      return '(' + [quote(row.id), quote(row.fen), arrayLiteral(moves), arrayLiteral(themes), String(Number(row.rating)), practice ? 'true' : 'false'].join(',') + ')';
+      return '(' + [quote(row.id), quote(row.fen), arrayLiteral(moves), arrayLiteral(themes), String(Number(row.rating)), practice ? 'true' : 'false', String(Number(row.serial))].join(',') + ')';
     });
-    chunks.push('insert into chess_private.puzzles (id, fen, moves, themes, rating, practice) values\n' + values.join(',\n') + '\non conflict (id) do nothing;');
+    chunks.push('insert into chess_private.puzzles (id, fen, moves, themes, rating, practice, serial) values\n' + values.join(',\n') + '\non conflict (id) do update set serial = excluded.serial;');
   }
   return chunks.join('\n');
 }

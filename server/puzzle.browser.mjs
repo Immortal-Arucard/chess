@@ -22,8 +22,8 @@ const sans = sample.moves.map((uci) => {
   return played.san;
 });
 const active = {
-  attemptId, puzzleId: sample.id, puzzleRating: sample.rating, themes: sample.themes,
-  setupFen: sample.fen, applied: [sample.moves[0]], status: 'active', finished: false,
+  attemptId, puzzleId: sample.id, lichessId: sample.id, serial: 1042, puzzleRating: sample.rating, themes: sample.themes,
+  setupFen: sample.fen, applied: [sample.moves[0]], status: 'active', finished: false, summoned: false,
   solution: null, played: [], streak: 4, best: 6, userRating: 1200, delta: null, bonus: null, gain: 0
 };
 const solved = Object.assign({}, active, {
@@ -59,7 +59,7 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === '/api/profiles/' + mina) return send({ id: mina, displayName: 'Mina Chen', createdAt: '2026-01-01T00:00:00Z', bio: '', hasPortrait: false, hasBackground: false, ratings: { bullet: 1510, blitz: 1602, rapid: 1488, daily: 1400, untimed: 900, puzzles: 1213 } });
   if (url.pathname === '/api/puzzles/attempts' && req.method === 'GET') {
-    return send({ attempts: [{ id: attemptId, puzzleId: sample.id, puzzleRating: sample.rating, status: 'solved', delta: 13, bonus: 2, streakBefore: 4, streakAfter: 5, finishedAt: '2026-11-09T20:00:00.000Z' }], next: { finishedAt: '2026-11-09T19:00:00.000Z', id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' } });
+    return send({ attempts: [{ id: attemptId, puzzleId: sample.id, lichessId: sample.id, serial: 1042, puzzleRating: sample.rating, status: 'solved', summoned: false, delta: 13, bonus: 2, streakBefore: 4, streakAfter: 5, finishedAt: '2026-11-09T20:00:00.000Z' }], next: { finishedAt: '2026-11-09T19:00:00.000Z', id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' } });
   }
   if (url.pathname === '/api/puzzles/attempts/' + attemptId) return send(solved);
   if (url.pathname.endsWith('/posts')) return send({ posts: [] });
@@ -106,7 +106,7 @@ try {
   await client.send('Network.setBypassServiceWorker', { bypass: true });
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(origin + '/puzzles/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.body.innerText.includes('Puzzle rating 1200') && document.body.innerText.includes('Weakest to strongest'));
+  await page.waitForFunction(() => document.body.innerText.includes('Puzzle rating 1200') && document.body.innerText.includes('Weakest to strongest') && document.body.innerText.toLowerCase().includes('go to puzzle'));
   assert.equal(await page.$eval('#puzzle-order', (node) => node.value), 'tier');
   assert.equal(await page.$eval('#puzzle-min', (node) => node.value), '800');
   await shot(page, 'puzzle_settings_desktop.png');
@@ -114,7 +114,7 @@ try {
   await shot(page, 'puzzle_settings_phone.png');
   await page.setViewport({ width: 1280, height: 900 });
   await page.evaluate(() => document.getElementById('puzzle-start').click());
-  await page.waitForFunction((id) => document.body.innerText.includes('Puzzle ' + id), {}, sample.id);
+  await page.waitForFunction((id) => document.body.innerText.includes('Puzzle #1042') && document.body.innerText.includes('Lichess ' + id) && document.getElementById('puzzle-copy'), {}, sample.id);
   await page.waitForSelector('#puzzle-board .square');
   await shot(page, 'puzzle_board_desktop.png');
   await page.setViewport({ width: 390, height: 844 });
@@ -141,7 +141,7 @@ try {
 
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(origin + '/community/profile/?id=' + mina, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction((id) => document.body.innerText.includes('Puzzle attempts') && document.body.innerText.includes('Puzzle ' + id) && document.body.innerText.includes('Solved') && document.body.innerText.includes('+11 +2 streak') && document.body.innerText.includes('Puzzles 1213'), {}, sample.id);
+  await page.waitForFunction((id) => document.body.innerText.includes('Puzzle attempts') && document.body.innerText.includes('#1042') && document.body.innerText.includes('Puzzle ' + id) && document.body.innerText.includes('Solved') && document.body.innerText.includes('+11 +2 streak') && document.body.innerText.includes('Open #1042') && document.body.innerText.includes('Puzzles 1213'), {}, sample.id);
   await page.evaluate(() => document.querySelector('.puzzle-attempt button').click());
   await page.waitForFunction((uci) => document.body.innerText.includes('Move 1 ' + uci) && document.body.innerText.includes('1.8s') && document.body.innerText.includes('Solution'), {}, sample.moves[1]);
   await shot(page, 'puzzle_history_desktop.png');
