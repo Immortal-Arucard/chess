@@ -68,6 +68,12 @@ export async function handlePuzzleGet({ url, token, query, send }) {
 
 export async function handlePuzzlePost({ url, token, body, query, send }) {
   if (!url.pathname.startsWith('/api/puzzles')) return false;
+  if (url.pathname === '/api/puzzles/summon') {
+    const serial = Number(body.serial);
+    if (!Number.isInteger(serial)) throw new Error('That puzzle was not found.');
+    const result = await query('select chess_service.puzzle_summon($1, $2) as puzzle', [token, serial]);
+    return send(200, decorate(result.rows[0].puzzle));
+  }
   if (url.pathname === '/api/puzzles/next') {
     const result = await query('select chess_service.puzzle_next($1) as puzzle', [token]);
     return send(200, decorate(result.rows[0].puzzle));

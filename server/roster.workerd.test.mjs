@@ -38,7 +38,7 @@ psql(db, `
   create schema if not exists extensions;
   create extension if not exists pgcrypto schema extensions;
 `);
-['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql'].forEach((file) => psqlFile(db, file));
+['supabase/chess_release.sql', 'supabase/chess_discussion.sql', 'supabase/chess_profile_card.sql', 'supabase/chess_human.sql', 'supabase/chess_roster.sql', 'supabase/chess_ratings.sql', 'supabase/chess_puzzles.sql', 'supabase/chess_puzzle_serial.sql'].forEach((file) => psqlFile(db, file));
 psql(db, `
   alter role chess_server login password '${password}';
   grant connect on database ${db} to chess_server;

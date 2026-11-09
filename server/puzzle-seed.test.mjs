@@ -8,6 +8,11 @@ const ids = new Set(rated.map((row) => row.id));
 const bands = new Map();
 
 assert.ok(rated.length >= 3000);
+const ratedById = [...rated].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+assert.deepEqual(rated.map((row) => row.serial), ratedById.map((row) => row.serial));
+ratedById.forEach((row, index) => assert.equal(row.serial, index + 1));
+const practiceById = [...practice].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+practiceById.forEach((row, index) => assert.equal(row.serial, rated.length + index + 1));
 assert.equal(practice.length, 50);
 assert.equal(practice.some((row) => ids.has(row.id)), false);
 for (const row of rated.concat(practice)) {

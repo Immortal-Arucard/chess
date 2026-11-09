@@ -3,3 +3,4 @@ Source: https://database.lichess.org/lichess_db_puzzle.csv.zst
 License: CC0. Puzzle ratings in that database are unchanged here.
 The rated pool is loaded once with: node server/seed-puzzles.mjs
 practice.json is the signed-out offline pack and is not part of the rated pool.
+Each puzzle has a serial number stored in the JSON. Rated puzzles are numbered from 1 in Lichess id order, then the practice pack continues. Loading the seed again writes the same serial.
