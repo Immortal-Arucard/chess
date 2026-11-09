@@ -167,3 +167,5 @@
     button.focus();
   });
 })();
+
+import('/assets/chess/account-menu.js').catch(function () { /* the header stays usable without the account control */ });
