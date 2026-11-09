@@ -46,10 +46,17 @@ jobs:
         env:
           CI: "1"
           WRANGLER_SEND_METRICS: "false"
+      - run: node server/profile-upload.workerd.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"
       - run: node server/browser-e2e.mjs
         env:
           CI: "1"
           CHROME_PATH: /usr/bin/google-chrome
       - run: node server/profile-layout.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/profile-upload.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome

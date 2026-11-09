@@ -11,6 +11,12 @@ export function routeApi(pathname) {
   return String(pathname || '').startsWith('/api/');
 }
 
+export function workerBody(payload) {
+  if (payload == null) return null;
+  if (payload instanceof Uint8Array) return payload;
+  return String(payload);
+}
+
 export function trustedClientIp(request) {
   const value = request.headers.get('CF-Connecting-IP');
   if (!value || value.includes(',')) return 'untrusted';
@@ -58,7 +64,7 @@ function bridge(app, request) {
           if (String(key).toLowerCase() === 'set-cookie' && Array.isArray(value)) value.forEach((cookie) => out.append('set-cookie', cookie));
           else if (value != null) out.set(key, Array.isArray(value) ? value.join(', ') : String(value));
         }
-        resolve(new Response(payload == null ? null : String(payload), { status: this.statusCode, headers: out }));
+        resolve(new Response(workerBody(payload), { status: this.statusCode, headers: out }));
       }
     };
     Promise.resolve(app.handle(req, res)).catch(reject);

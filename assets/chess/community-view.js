@@ -1,4 +1,5 @@
 import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
+import { prepareProfileImage } from './profile-picture.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -664,17 +665,13 @@ export function mountProfile(root, options) {
   let cursor = null;
   let imageVersion = 1;
 
-  async function saveImage(kind, input) {
+  async function saveImage(kind, file) {
     const editingId = person.id;
+    if (!file) throw new Error('Choose a JPEG, PNG, or WebP image.');
+    const prepared = await prepareProfileImage(file);
     const session = await gateway.profile();
     if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
-    const file = input.files && input.files[0];
-    if (!file) throw new Error('Choose a JPEG, PNG, or WebP image.');
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 524288) {
-      throw new Error('Use a JPEG, PNG, or WebP image up to 512 KB.');
-    }
-    const bytes = await file.arrayBuffer();
-    await gateway.saveProfileImage(kind, bytes, file.type, editingId);
+    await gateway.saveProfileImage(kind, prepared.bytes, prepared.type, editingId);
     if (kind === 'portrait') person.hasPortrait = true;
     else person.hasBackground = true;
     imageVersion += 1;
@@ -777,10 +774,16 @@ export function mountProfile(root, options) {
       backgroundInput.id = 'background-file';
       const savePortrait = el('button', 'tool', 'Save profile picture');
       savePortrait.type = 'button';
-      savePortrait.addEventListener('click', () => load(() => saveImage('portrait', portraitInput)));
+      savePortrait.addEventListener('click', () => {
+        const file = portraitInput.files && portraitInput.files[0];
+        load(() => saveImage('portrait', file));
+      });
       const saveBackground = el('button', 'tool', 'Save background image');
       saveBackground.type = 'button';
-      saveBackground.addEventListener('click', () => load(() => saveImage('background', backgroundInput)));
+      saveBackground.addEventListener('click', () => {
+        const file = backgroundInput.files && backgroundInput.files[0];
+        load(() => saveImage('background', file));
+      });
       const tools = el('div', 'community-tools');
       tools.append(name, button, field('Bio', bioInput), saveBio, field('Profile picture', portraitInput), savePortrait, field('Background image', backgroundInput), saveBackground);
       root.append(tools);
