@@ -50,7 +50,7 @@ try {
     cached = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration || !registration.active) return false;
-      const cache = await caches.open('chess-v16');
+      const cache = await caches.open('chess-v17');
       const keys = await cache.keys();
       return keys.some((key) => key.url.endsWith('/assets/chess/profile-picture.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/author-avatar.js'))
@@ -60,6 +60,7 @@ try {
         && keys.some((key) => key.url.endsWith('/assets/chess/community-view.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/roster.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/rating.js'))
+        && keys.some((key) => key.url.endsWith('/assets/chess/account-menu.js'))
         && keys.some((key) => key.url.endsWith('/puzzles/puzzle.js'))
         && keys.some((key) => key.url.endsWith('/puzzles/practice.json'))
         && keys.some((key) => key.url.endsWith('/community/roster/'));
@@ -67,7 +68,7 @@ try {
     if (cached) break;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  assert.equal(cached, true, 'chess-v16 did not precache the roster');
+  assert.equal(cached, true, 'chess-v17 did not precache the roster');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.setOfflineMode(true);
   for (const path of screens) {

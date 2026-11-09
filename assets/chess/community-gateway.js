@@ -73,6 +73,7 @@ export function createChessGateway() {
       await send('/api/logout');
       try { sessionStorage.removeItem(PENDING_NAME); } catch (err) { /* ignore */ }
       listener();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('chess-session'));
     },
     async joinChess(displayName) {
       const body = await send('/api/join', { displayName });

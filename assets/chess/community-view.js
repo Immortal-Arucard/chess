@@ -396,6 +396,14 @@ export function mountCommunity(root, options) {
         if (profile) await loadFirst();
       });
     });
+    window.addEventListener('chess-session', () => {
+      run(async () => {
+        await refreshSession();
+        phase = 'ready';
+        if (profile) await loadFirst();
+        else posts = [];
+      });
+    });
     run(async () => {
       await refreshSession();
       phase = 'ready';
