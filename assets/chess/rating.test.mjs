@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { drawShares, ratingResult, winGain } from './rating.js';
+import { drawShares, puzzleScore, ratingResult, winGain } from './rating.js';
 
 assert.equal(winGain(0), 10);
 assert.equal(winGain(1), 11);
@@ -56,5 +56,32 @@ assert.equal(ceilCase.black, 17);
 const applied = ratingResult('1/2-1/2', 0, 501);
 assert.equal(applied.white.delta, 5);
 assert.equal(applied.black.delta, 17);
+
+const first = puzzleScore('solved', 0, 0, 0);
+assert.equal(first.gain, 10);
+assert.equal(first.bonus, 0);
+assert.equal(first.delta, 10);
+assert.equal(first.streakAfter, 1);
+const second = puzzleScore('solved', 10, 0, 1);
+assert.equal(second.gain, 9);
+assert.equal(second.bonus, 1);
+assert.equal(second.delta, 10);
+assert.equal(second.streakAfter, 2);
+const third = puzzleScore('solved', 1000, 1101, 2);
+assert.equal(third.gain, 12);
+assert.equal(third.bonus, 2);
+assert.equal(third.delta, 14);
+const missed = puzzleScore('failed', 1000, 1101, 4);
+assert.equal(missed.loss, winGain(-101) + 1);
+assert.equal(missed.delta, -(winGain(-101) + 1));
+assert.equal(missed.streakAfter, 0);
+assert.equal(missed.bonus, 0);
+const floored = puzzleScore('failed', 0, 400, 3);
+assert.equal(floored.after, 0);
+assert.equal(floored.delta, 0);
+assert.equal(floored.streakAfter, 0);
+const left = puzzleScore('abandoned', 40, 900, 3);
+assert.equal(left.delta, 0);
+assert.equal(left.streakAfter, 3);
 
 console.log('rating formula tests passed');

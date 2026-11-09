@@ -658,6 +658,67 @@ export function mountProfile(root, options) {
   let posts = [];
   let cursor = null;
   let imageVersion = 1;
+  let attempts = null;
+  let attemptCursor = null;
+  let openAttempt = null;
+
+  function puzzleChange(item) {
+    if (item.status === 'abandoned') return 'Unrated';
+    if (item.status === 'solved') {
+      const bonus = Number(item.bonus) || 0;
+      const gain = Number(item.delta) - bonus;
+      return bonus ? '+' + gain + ' +' + bonus + ' streak' : '+' + gain;
+    }
+    const delta = Number(item.delta) || 0;
+    return delta > 0 ? '+' + delta : String(delta);
+  }
+
+  function puzzleStatus(status) {
+    if (status === 'solved') return 'Solved';
+    if (status === 'failed') return 'Failed';
+    return 'Abandoned';
+  }
+
+  function renderPuzzleHistory() {
+    const section = el('section', 'puzzle-history');
+    section.append(el('h2', null, 'Puzzle attempts'));
+    if (!attempts.length) section.append(el('p', null, 'No puzzle attempts yet.'));
+    attempts.forEach((item) => {
+      const block = el('article', 'puzzle-attempt');
+      const button = el('button', 'tool', 'Puzzle ' + item.puzzleId + ' · ' + item.puzzleRating + ' · ' + puzzleStatus(item.status) + ' · ' + puzzleChange(item) + ' · streak ' + item.streakBefore);
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        if (openAttempt && openAttempt.attemptId === item.id) {
+          openAttempt = null;
+          render();
+          return;
+        }
+        load(async () => { openAttempt = await gateway.puzzleAttempt(item.id); });
+      });
+      block.append(button);
+      if (openAttempt && openAttempt.attemptId === item.id) {
+        (openAttempt.played || []).forEach((move) => {
+          const seconds = ((Number(move.millis) || 0) / 1000).toFixed(1);
+          block.append(el('p', null, 'Move ' + move.ply + ' ' + move.uci + (move.correct ? '' : ' incorrect') + ' · ' + seconds + 's'));
+        });
+        const solution = openAttempt.solutionSans || openAttempt.solution || [];
+        block.append(el('p', null, 'Solution ' + solution.join(' ')));
+      }
+      section.append(block);
+    });
+    if (attemptCursor) {
+      const more = el('button', 'tool', 'Older attempts');
+      more.type = 'button';
+      more.id = 'older-attempts';
+      more.addEventListener('click', () => load(async () => {
+        const page = await gateway.puzzleAttempts(attemptCursor);
+        attempts = attempts.concat(page.attempts);
+        attemptCursor = page.next;
+      }));
+      section.append(more);
+    }
+    root.append(section);
+  }
 
   async function saveImage(kind, file) {
     const editingId = person.id;
@@ -752,6 +813,7 @@ export function mountProfile(root, options) {
     }
     root.append(el('p', 'community-note', 'This is a Chess community profile. It does not show an email address or any other service.'));
     if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
+    if (attempts) renderPuzzleHistory();
     if (viewer && viewer.id === person.id) {
       const name = document.createElement('input');
       name.type = 'text';
@@ -864,5 +926,14 @@ export function mountProfile(root, options) {
     const page = await gateway.listAuthorPosts(person.id, { cursor: null, limit: LIMITS.pageSize });
     posts = page.posts;
     cursor = page.nextCursor;
+    if (viewer && person && viewer.id === person.id && gateway && gateway.puzzleAttempts) {
+      try {
+        const history = await gateway.puzzleAttempts(null);
+        attempts = history.attempts;
+        attemptCursor = history.next;
+      } catch (err) {
+        attempts = null;
+      }
+    }
   });
 }

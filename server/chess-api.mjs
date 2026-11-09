@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { validateGame } from './game-record.mjs';
 import { handleHumanGet, handleHumanPost } from './human-api.mjs';
+import { handlePuzzleGet, handlePuzzlePost } from './puzzle-api.mjs';
 import { sanitizeProfileImage } from './profile-image.mjs';
 import { createSupabaseAuth } from './supabase-auth.mjs';
 
@@ -132,7 +133,10 @@ function publicError(error) {
     'You can write in this game only as a player.',
     'This dialogue is already saved with your game.',
     'Enter at least 2 characters of a display name.',
-    'You already have too many open challenges.'
+    'You already have too many open challenges.',
+    'That puzzle order is not available.',
+    'That puzzle range is not available.',
+    'That puzzle attempt was not found.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
@@ -347,6 +351,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const human = await handleHumanGet({ url, token, query, send });
         if (human !== false) return;
       }
+      if (req.method === 'GET' && url.pathname.startsWith('/api/puzzles')) {
+        const puzzle = await handlePuzzleGet({ url, token, query, send });
+        if (puzzle !== false) return;
+      }
       if (req.method !== 'POST') return send(405, { error: 'Method not allowed.' });
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
       if (url.pathname === '/api/auth/start') {
@@ -458,6 +466,18 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         if (body.autoRecordHumanChat !== undefined) {
           await query('select chess_service.human_record_setting_set($1, $2) as settings', [token, body.autoRecordHumanChat === true]);
         }
+        if (body.puzzleOrder !== undefined) {
+          const min = body.puzzleMin === null || body.puzzleMin === '' ? null : Number(body.puzzleMin);
+          const max = body.puzzleMax === null || body.puzzleMax === '' ? null : Number(body.puzzleMax);
+          const tier = body.puzzleTier === null || body.puzzleTier === '' ? null : Number(body.puzzleTier);
+          await query('select chess_service.puzzle_settings_set($1, $2, $3, $4, $5) as settings', [
+            token,
+            body.puzzleOrder,
+            Number.isInteger(min) ? min : null,
+            Number.isInteger(max) ? max : null,
+            Number.isInteger(tier) ? tier : null
+          ]);
+        }
         const result = await query('select chess_service.chess_settings($1) as settings', [token]);
         return send(200, result.rows[0].settings);
       }
@@ -470,6 +490,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (url.pathname.startsWith('/api/human')) {
         const human = await handleHumanPost({ url, token, body, query, send });
         if (human !== false) return;
+      }
+      if (url.pathname.startsWith('/api/puzzles')) {
+        const puzzle = await handlePuzzlePost({ url, token, body, query, send });
+        if (puzzle !== false) return;
       }
       if (url.pathname === '/api/games/list') {
         const result = await query('select chess_service.game_page($1, $2, $3, $4) as games', [

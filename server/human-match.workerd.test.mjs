@@ -47,6 +47,7 @@ psqlFile(db, 'supabase/chess_profile_card.sql');
 psqlFile(db, 'supabase/chess_human.sql');
 psqlFile(db, 'supabase/chess_roster.sql');
 psqlFile(db, 'supabase/chess_ratings.sql');
+psqlFile(db, 'supabase/chess_puzzles.sql');
 psql(db, `alter role chess_server login password '${password}'; grant connect on database ${db} to chess_server; ${seed(mina)} ${seed(julian)} ${seed(nora)}`);
 const host = process.env.PGHOST || '127.0.0.1';
 const port = process.env.PGPORT || '5432';
