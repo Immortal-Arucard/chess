@@ -167,6 +167,48 @@ try {
   psql(db, 'select chess_service.human_expire();');
   assert.equal(changes(flagged.json.id), '2');
 
+  async function playOut(id, version, sans, white, black) {
+    let current = version;
+    let last = null;
+    for (let index = 0; index < sans.length; index += 1) {
+      const player = index % 2 === 0 ? white : black;
+      last = await call(worker, player, 'POST', '/api/human/move', { id, version: current, san: sans[index] });
+      assert.equal(last.status, 200, last.text);
+      current = last.json.version;
+    }
+    return last;
+  }
+
+  setRating(mina.profile, 'daily', 1000);
+  setRating(julian.profile, 'daily', 1000);
+  const mate = await call(worker, mina, 'POST', '/api/human/challenges', { kind: 'named', opponentId: julian.profile, color: 'white', category: 'daily', preset: '1d', rated: true });
+  const mateLive = await call(worker, julian, 'POST', '/api/human/accept', { id: mate.json.id });
+  const mated = await playOut(mate.json.id, mateLive.json.version, ['e4', 'e5', 'Qh5', 'Nc6', 'Bc4', 'Nf6', 'Qxf7'], mina, julian);
+  const mateScore = ratingResult('1-0', 1000, 1000);
+  assert.equal(mated.json.result, '1-0');
+  assert.equal(mated.json.termination, 'checkmate');
+  assert.equal(mated.json.whiteDelta, mateScore.white.delta);
+  assert.equal(mated.json.blackDelta, mateScore.black.delta);
+  assert.equal(changes(mate.json.id), '2');
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${mina.profile}' and category = 'daily';`), String(mateScore.white.after));
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${julian.profile}' and category = 'daily';`), String(mateScore.black.after));
+
+  setRating(mina.profile, 'rapid', 400);
+  setRating(julian.profile, 'rapid', 400);
+  const stale = await call(worker, mina, 'POST', '/api/human/challenges', { kind: 'named', opponentId: julian.profile, color: 'white', category: 'rapid', preset: '10+0', rated: true });
+  const staleLive = await call(worker, julian, 'POST', '/api/human/accept', { id: stale.json.id });
+  psql(db, `update chess_private.human_matches set start_fen = 'k7/2Q5/2K5/8/8/8/8/8 w - - 0 1' where id = '${stale.json.id}';`);
+  const drawnByMove = await call(worker, mina, 'POST', '/api/human/move', { id: stale.json.id, version: staleLive.json.version, san: 'Qb6' });
+  const moveDraw = drawShares(400, 400);
+  assert.equal(drawnByMove.status, 200, drawnByMove.text);
+  assert.equal(drawnByMove.json.result, '1/2-1/2');
+  assert.equal(drawnByMove.json.termination, 'stalemate');
+  assert.equal(drawnByMove.json.whiteDelta, moveDraw.white);
+  assert.equal(drawnByMove.json.blackDelta, moveDraw.black);
+  assert.equal(changes(stale.json.id), '2');
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${mina.profile}' and category = 'rapid';`), String(400 + moveDraw.white));
+  assert.equal(psql(db, `select rating from chess_private.profile_ratings where profile_id = '${julian.profile}' and category = 'rapid';`), String(400 + moveDraw.black));
+
   const roster = await call(worker, null, 'GET', '/api/community/roster?sort=blitz');
   assert.equal(roster.json.ratingSort, true);
   assert.equal(roster.json.members.find((member) => member.id === mina.profile).ratings.blitz, 1491);

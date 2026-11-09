@@ -747,6 +747,80 @@ begin
 end;
 $$;
 
+create or replace function chess_service.human_move(raw_token text, expected uuid, match_id uuid, expected_version integer, san text, next_result text, next_termination text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor uuid;
+  match chess_private.human_matches;
+  side text;
+  elapsed integer;
+  remaining integer;
+  refreshed integer;
+begin
+  actor := chess_private.as_profile(raw_token);
+  if expected is distinct from actor then
+    raise exception 'You can play only as your own Chess profile.';
+  end if;
+  if san is null or san !~ '^((O-O-O|O-O)[+#]?|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?[+#]?)$' then
+    raise exception 'That move is not legal.';
+  end if;
+  if next_result is not null and next_result not in ('1-0', '0-1', '1/2-1/2') then
+    raise exception 'The result does not match the position.';
+  end if;
+  if next_termination is not null and next_termination not in ('checkmate', 'stalemate', 'threefold', 'fifty', 'insufficient', 'draw') then
+    raise exception 'The ending is not one this service stores.';
+  end if;
+  select * into match from chess_private.human_matches games where games.id = match_id and games.status = 'active' for update;
+  if not found then
+    raise exception 'That game was not found.';
+  end if;
+  if match.version <> expected_version then
+    raise exception 'The board changed. Reload this game.';
+  end if;
+  side := chess_private.human_turn(match);
+  if (side = 'white' and match.white_id is distinct from actor) or (side = 'black' and match.black_id is distinct from actor) then
+    raise exception 'It is not your turn.';
+  end if;
+  if match.daily_days is not null and match.deadline_at <= clock_timestamp() then
+    match := chess_private.human_finish(match.id, case when side = 'white' then '0-1' else '1-0' end, 'timeout');
+    return chess_private.human_project(match, actor) || jsonb_build_object('messages', chess_private.human_dialogue(match.id));
+  end if;
+  if match.base_ms is not null then
+    elapsed := greatest(0, floor(extract(epoch from (clock_timestamp() - match.clock_at)) * 1000))::integer;
+    remaining := case when side = 'white' then match.white_ms else match.black_ms end - elapsed;
+    if remaining <= 0 then
+      match := chess_private.human_finish(match.id, case when side = 'white' then '0-1' else '1-0' end, 'timeout');
+      return chess_private.human_project(match, actor) || jsonb_build_object('messages', chess_private.human_dialogue(match.id));
+    end if;
+    refreshed := remaining + match.increment_ms;
+  end if;
+  update chess_private.human_matches games
+    set sans = games.sans || to_jsonb(san),
+        white_ms = case when games.base_ms is null then games.white_ms when side = 'white' then refreshed else games.white_ms end,
+        black_ms = case when games.base_ms is null then games.black_ms when side = 'black' then refreshed else games.black_ms end,
+        clock_at = case when games.base_ms is null then games.clock_at else clock_timestamp() end,
+        deadline_at = case when games.daily_days is not null then clock_timestamp() + make_interval(days => games.daily_days) else null end,
+        draw_offer = null,
+        status = case when next_result is null then 'active' else 'finished' end,
+        result = next_result,
+        termination = next_termination,
+        finished_at = case when next_result is null then null else clock_timestamp() end,
+        updated_at = clock_timestamp(),
+        version = games.version + 1
+    where games.id = match.id
+    returning * into match;
+  if match.status = 'finished' then
+    perform chess_private.human_store_result(match, chess_private.human_dialogue(match.id), true);
+    perform chess_private.apply_match_ratings(match);
+  end if;
+  return chess_private.human_project(match, actor) || jsonb_build_object('messages', chess_private.human_dialogue(match.id));
+end;
+$$;
+
 revoke all on function chess_private.rating_value(uuid, text) from public, anon, authenticated, chess_api;
 revoke all on function chess_private.rating_json(uuid) from public, anon, authenticated, chess_api;
 revoke all on function chess_private.win_gain(integer) from public, anon, authenticated, chess_api;
