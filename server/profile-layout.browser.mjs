@@ -177,7 +177,7 @@ try {
     hrefs: [...nav.querySelectorAll('a')].map((anchor) => anchor.getAttribute('href')),
     tall: [...nav.querySelectorAll('a')].every((anchor) => anchor.getBoundingClientRect().height >= 72)
   }));
-  assert.deepEqual(home.hrefs, ['/community/', '/community/discussion/']);
+  assert.deepEqual(home.hrefs, ['/community/', '/community/discussion/', '/community/roster/']);
   assert.equal(home.tall, true);
   assert.match(home.text, /Community/);
   assert.match(home.text, /Discussion/);

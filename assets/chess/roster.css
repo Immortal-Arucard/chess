@@ -1,0 +1,32 @@
+.roster-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+.roster-tools input{
+  flex:1 1 12rem;min-height:44px;padding:10px 12px;border-radius:12px;
+  border:1px solid var(--line);background:#000;color:#fff;font:inherit
+}
+.roster-sorts{display:flex;flex-wrap:wrap;gap:8px}
+.roster-count{color:var(--mute);margin:0 0 8px}
+.roster-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.roster-row{
+  display:flex;gap:12px;align-items:center;justify-content:space-between;
+  min-height:64px;padding:10px 4px;border-bottom:1px solid var(--line);
+  color:#fff;text-decoration:none
+}
+.roster-row:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
+.roster-person{min-width:0;flex:1 1 auto}
+.roster-person .author-name{
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%
+}
+.roster-ratings{
+  display:grid;grid-template-columns:repeat(5,minmax(3.4rem,auto));gap:6px 8px;flex:0 0 auto
+}
+.roster-rating{display:flex;flex-direction:column;align-items:center;min-width:3.2rem}
+.roster-rating b{
+  color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase
+}
+.roster-score{color:#fff;font-variant-numeric:tabular-nums;font-size:16px}
+.roster-empty{color:var(--mute)}
+@media (max-width:640px){
+  .roster-row{align-items:flex-start;flex-wrap:wrap}
+  .roster-person{flex:1 1 100%}
+  .roster-ratings{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+}

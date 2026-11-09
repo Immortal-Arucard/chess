@@ -1,4 +1,4 @@
-const CACHE = 'chess-v12';
+const CACHE = 'chess-v13';
 const ROUTES = [
   '/',
   '/theory/',
@@ -8,6 +8,7 @@ const ROUTES = [
   '/analysis/',
   '/community/',
   '/community/discussion/',
+  '/community/roster/',
   '/community/profile/',
   '/marketplace/',
   '/exchange/'
@@ -31,6 +32,8 @@ const ASSETS = [
   '/community/profile/index.html',
   '/community/discussion/',
   '/community/discussion/index.html',
+  '/community/roster/',
+  '/community/roster/index.html',
   '/marketplace/',
   '/marketplace/index.html',
   '/exchange/',
@@ -54,6 +57,8 @@ const ASSETS = [
   '/assets/chess/profile-picture.js',
   '/assets/chess/community-gateway.js',
   '/assets/chess/community-app.js',
+  '/assets/chess/roster.js',
+  '/assets/chess/roster.css',
   '/human/human.js',
   '/assets/chess/human-rules.js',
   '/assets/chess/human.css',

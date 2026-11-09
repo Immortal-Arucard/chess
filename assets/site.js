@@ -60,6 +60,7 @@
             { href: 'self:/analysis/', name: 'Game analysis' },
             { href: 'self:/community/', name: 'Community' },
             { href: 'self:/community/discussion/', name: 'Discussion' },
+            { href: 'self:/community/roster/', name: 'Roster' },
             { href: 'self:/marketplace/', name: 'Marketplace' },
             { href: 'self:/exchange/', name: 'Exchange' }
           ]
