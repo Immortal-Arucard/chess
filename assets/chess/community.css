@@ -15,9 +15,36 @@
 .community-post h3,.community-reply h4{
   margin:0;color:var(--sky);font-size:16px;font-family:Inter,system-ui,sans-serif;
 }
+.author-chip{
+  display:inline-flex;align-items:center;gap:8px;max-width:100%;min-height:32px;
+  color:var(--sky);text-decoration:none;vertical-align:middle;
+}
+.author-name{min-width:0;overflow-wrap:anywhere;text-align:left}
+.author-avatar{
+  width:32px;height:32px;flex:0 0 32px;border-radius:50%;overflow:hidden;
+  border:1px solid var(--line);background:#1a1a1a;display:inline-block;
+}
+.author-avatar img{width:32px;height:32px;object-fit:cover;display:block}
+.author-avatar.is-absent{
+  background:
+    radial-gradient(circle at 50% 36%, #d0d0d0 0 4px, transparent 5px),
+    radial-gradient(circle at 50% 74%, #d0d0d0 0 7px, transparent 8px),
+    #1a1a1a;
+}
+.author-avatar.is-unavailable{
+  border-style:dashed;
+  background:
+    linear-gradient(135deg, transparent 46%, #8a8a8a 46% 54%, transparent 54%),
+    #1a1a1a;
+}
+.author-chip:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
 .community-time{margin:4px 0 0;color:var(--mute);font-size:12px}
 .community-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
-.discussion-line{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
+.discussion-line{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
+  white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55;
+}
+.discussion-line .discussion-body{flex:1 1 12rem;min-width:0}
 .discussion-log{margin-top:12px}
 .tool{
   appearance:none;min-height:44px;padding:0 12px;border-radius:12px;
@@ -25,7 +52,7 @@
 }
 .tool:disabled{opacity:.6;cursor:default}
 .tool:focus-visible,.community-field input:focus-visible,.community-field textarea:focus-visible,
-.profile-exit:focus-visible,.profile-back:focus-visible,.community-entries .entry:focus-visible{
+.profile-exit:focus-visible,.profile-back:focus-visible,.community-entries .entry:focus-visible,.author-chip:focus-visible{
   outline:2px solid var(--sky);outline-offset:3px;
 }
 body.profile-page{display:block;min-height:100vh;padding:0;background:#000}

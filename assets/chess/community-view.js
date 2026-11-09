@@ -1,18 +1,12 @@
 import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
 import { prepareProfileImage } from './profile-picture.js';
+import { authorChip, forgetAuthorPortrait, portraitFor } from './author-avatar.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
-}
-
-function authorLink(name, id) {
-  const link = document.createElement('a');
-  link.href = profilePath(id);
-  link.textContent = name;
-  return link;
 }
 
 function field(labelText, control) {
@@ -286,7 +280,7 @@ export function mountCommunity(root, options) {
   function postArticle(post) {
     const article = el('article', 'community-post');
     const title = el('h3');
-    title.append(authorLink(post.authorName, post.authorId));
+    title.append(authorChip(post.authorName, post.authorId));
     article.append(title, el('p', 'community-time', post.createdAt), textBlock(post.body));
     if (post.hidden) article.append(el('p', 'community-note', 'Hidden from other members.'));
     const bar = el('div', 'community-tools');
@@ -320,7 +314,7 @@ export function mountCommunity(root, options) {
   function replyArticle(reply) {
     const block = el('div', 'community-reply');
     const title = el('h4');
-    title.append(authorLink(reply.authorName, reply.authorId));
+    title.append(authorChip(reply.authorName, reply.authorId));
     block.append(title, el('p', 'community-time', reply.createdAt), textBlock(reply.body));
     if (reply.hidden) block.append(el('p', 'community-note', 'Hidden from other members.'));
     if (profile && reply.authorId === profile.id) {
@@ -472,10 +466,10 @@ export function mountDiscussion(root, options) {
     }
     messages.forEach((item) => {
       const line = el('p', 'discussion-line');
-      const who = document.createElement('a');
-      who.href = profilePath(item.authorId);
-      who.textContent = item.authorName || 'Member';
-      line.append(who, document.createTextNode(' ' + item.body));
+      const body = document.createElement('span');
+      body.className = 'discussion-body';
+      body.textContent = ' ' + item.body;
+      line.append(authorChip(item.authorName || 'Member', item.authorId), body);
       shell.log.append(line);
     });
   }
@@ -672,8 +666,10 @@ export function mountProfile(root, options) {
     const session = await gateway.profile();
     if (!session || session.id !== editingId) throw new Error('You can edit only your own Chess profile.');
     await gateway.saveProfileImage(kind, prepared.bytes, prepared.type, editingId);
-    if (kind === 'portrait') person.hasPortrait = true;
-    else person.hasBackground = true;
+    if (kind === 'portrait') {
+      person.hasPortrait = true;
+      forgetAuthorPortrait(person.id);
+    } else person.hasBackground = true;
     imageVersion += 1;
   }
 
@@ -718,9 +714,13 @@ export function mountProfile(root, options) {
     const portrait = el('div', 'profile-portrait');
     if (person.hasPortrait) {
       const img = document.createElement('img');
-      img.src = '/api/profiles/' + encodeURIComponent(person.id) + '/portrait?v=' + imageVersion;
       img.alt = person.displayName;
       portrait.append(img);
+      portraitFor(person.id).then((result) => {
+        if (!img.parentNode) return;
+        if (result.status === 'image' && result.url) img.src = result.url;
+        else portrait.replaceChildren(el('p', 'profile-empty', result.status === 'absent' ? 'No profile picture yet' : 'Profile picture unavailable'));
+      });
     } else {
       portrait.append(el('p', 'profile-empty', 'No profile picture yet'));
     }
@@ -795,7 +795,7 @@ export function mountProfile(root, options) {
     posts.forEach((post) => {
       const article = el('article', 'community-post');
       const title = el('h3');
-      title.append(authorLink(post.authorName, post.authorId));
+      title.append(authorChip(post.authorName, post.authorId));
       article.append(title, el('p', 'community-time', post.createdAt));
       const body = el('p', 'community-body');
       body.textContent = post.body;
