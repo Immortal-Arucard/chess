@@ -91,7 +91,6 @@ export async function handleHumanPost({ url, token, body, query, send }) {
   if (!url.pathname.startsWith('/api/human')) return false;
   const authorId = uuid(body.authorId);
   if (url.pathname === '/api/human/challenges') {
-    if (body.rated === true) throw new Error('Chess does not store a rated result.');
     const time = resolveTimeControl(body);
     const color = String(body.color || '');
     if (!['white', 'black', 'random'].includes(color)) throw new Error('Choose white, black, or random.');
@@ -99,8 +98,8 @@ export async function handleHumanPost({ url, token, body, query, send }) {
     const opponent = kind === 'named' ? uuid(body.opponentId) : null;
     if (kind === 'named' && !opponent) throw new Error('Choose a Chess member to challenge.');
     const result = await query(
-      'select chess_service.human_create($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as game',
-      [token, authorId, kind, color, time.category, time.label, time.baseMs, time.incrementMs, time.dailyDays, opponent]
+      'select chess_service.human_create($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) as game',
+      [token, authorId, kind, color, time.category, time.label, time.baseMs, time.incrementMs, time.dailyDays, opponent, body.rated === true]
     );
     return send(200, result.rows[0].game);
   }

@@ -5,6 +5,9 @@
 }
 .human-card h3{margin:0 0 6px;color:#fff;font-size:18px}
 .human-spec{color:var(--sky);font-weight:600}
+.human-rated{border:1px solid var(--sky);border-radius:16px;padding:12px;margin:12px 0}
+.human-rated legend{color:var(--sky);font-weight:700;padding:0 6px}
+.human-rating{font-variant-numeric:tabular-nums;color:var(--sky);font-weight:700}
 .human-players{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:8px 0}
 .human-clock{font-variant-numeric:tabular-nums;min-width:4.5rem;color:#fff}
 .human-clock.is-turn{color:var(--sky)}

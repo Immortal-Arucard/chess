@@ -14,10 +14,11 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const mina = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const julian = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const nora = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
+const empty = { bullet: 0, blitz: 0, rapid: 0, daily: 0, untimed: 0, puzzles: null };
 const members = [
-  { id: julian, displayName: 'Julian Park', hasPortrait: false, ratings: { bullet: null, blitz: null, rapid: null, daily: null, puzzles: null } },
-  { id: mina, displayName: 'Mina Chen', hasPortrait: true, ratings: { bullet: null, blitz: null, rapid: null, daily: null, puzzles: null } },
-  { id: nora, displayName: 'Nora <b>Ellison</b> with a very long display name', hasPortrait: false, ratings: { bullet: null, blitz: null, rapid: null, daily: null, puzzles: null } }
+  { id: julian, displayName: 'Julian Park', hasPortrait: false, ratings: { bullet: 1510, blitz: 1602, rapid: 1488, daily: 1400, untimed: 900, puzzles: null } },
+  { id: mina, displayName: 'Mina Chen', hasPortrait: true, ratings: empty },
+  { id: nora, displayName: 'Nora <b>Ellison</b> with a very long display name', hasPortrait: false, ratings: empty }
 ];
 const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css;charset=utf-8', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.txt': 'text/plain;charset=utf-8' };
 
@@ -100,11 +101,10 @@ try {
       hrefs: rows.map((row) => row.getAttribute('href')),
       markup: document.getElementById('roster-list').innerHTML.includes('<b>Ellison</b>'),
       text: nora.textContent,
-      unrated: rows[0].querySelectorAll('.roster-score').length,
+      scores: [...rows[0].querySelectorAll('.roster-score')].map((node) => node.textContent),
       labels: [...rows[0].querySelectorAll('.roster-score')].map((node) => node.getAttribute('aria-label')),
       ratingsRight: ratings.right,
       width: window.innerWidth,
-      ratingDisabled: document.querySelector('button[title="Ratings are not recorded yet"]').disabled,
       count: document.querySelector('.roster-count').textContent
     };
   });
@@ -115,10 +115,10 @@ try {
   ]);
   assert.equal(desktop.markup, false);
   assert.match(desktop.text, /Nora <b>Ellison<\/b>/);
-  assert.equal(desktop.unrated, 5);
-  assert.deepEqual(desktop.labels, ['Unrated', 'Unrated', 'Unrated', 'Unrated', 'Unrated']);
+  assert.deepEqual(desktop.scores, ['1510', '1602', '1488', '1400', '900', '\u2014']);
+  assert.deepEqual(desktop.labels, ['1510', '1602', '1488', '1400', '900', 'Unrated']);
   assert.ok(desktop.ratingsRight <= desktop.width + 1);
-  assert.equal(desktop.ratingDisabled, true);
+  assert.equal(await page.$eval('#roster-sort', (node) => [...node.options].some((option) => option.value === 'untimed' && !option.disabled)), true);
   assert.equal(desktop.count, '3 accounts');
   await page.waitForFunction(() => {
     const image = document.querySelector('.roster-row img');

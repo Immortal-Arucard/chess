@@ -6,7 +6,17 @@ const CATEGORIES = [
   ['blitz', 'Blitz'],
   ['rapid', 'Rapid'],
   ['daily', 'Daily'],
+  ['untimed', 'Untimed'],
   ['puzzles', 'Puzzles']
+];
+const SORTS = [
+  ['name', 'Name'],
+  ['newest', 'Newest'],
+  ['bullet', 'Bullet rating'],
+  ['blitz', 'Blitz rating'],
+  ['rapid', 'Rapid rating'],
+  ['daily', 'Daily rating'],
+  ['untimed', 'Untimed rating']
 ];
 
 let query = '';
@@ -49,7 +59,8 @@ async function load(cursor, append) {
   if (query) params.set('q', query);
   if (cursor && cursor.id) {
     params.set('beforeId', cursor.id);
-    if (cursor.name) params.set('beforeName', cursor.name);
+    if (cursor.rating != null) params.set('beforeName', String(cursor.rating));
+    else if (cursor.name) params.set('beforeName', cursor.name);
     if (cursor.createdAt) params.set('before', cursor.createdAt);
   }
   try {
@@ -99,24 +110,21 @@ function paint() {
     }
   });
   tools.append(input, search);
-  const sorts = el('div', 'roster-sorts');
-  [['name', 'Name'], ['newest', 'Newest']].forEach(([id, label]) => {
-    const button = el('button', 'tool', label);
-    button.type = 'button';
-    button.setAttribute('aria-pressed', sort === id ? 'true' : 'false');
-    button.addEventListener('click', () => {
-      if (sort === id) return;
-      sort = id;
-      load(null, false);
-    });
-    sorts.append(button);
+  const sorts = el('label', 'roster-sorts', 'Sort');
+  const select = document.createElement('select');
+  select.id = 'roster-sort';
+  SORTS.forEach(([id, label]) => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = label;
+    option.selected = sort === id;
+    select.append(option);
   });
-  const rating = el('button', 'tool', 'Rating');
-  rating.type = 'button';
-  rating.disabled = true;
-  rating.title = 'Ratings are not recorded yet';
-  rating.setAttribute('aria-disabled', 'true');
-  sorts.append(rating);
+  select.addEventListener('change', () => {
+    sort = select.value;
+    load(null, false);
+  });
+  sorts.append(select);
   tools.append(sorts);
   root.append(tools);
   if (notice) root.append(el('p', 'community-error', notice));
