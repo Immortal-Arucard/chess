@@ -13,6 +13,7 @@ mkdirSync(shots, { recursive: true });
 const mina = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css;charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.txt': 'text/plain;charset=utf-8' };
 let signedIn = false;
+let accountMode = 'chess';
 const sessionWaiters = [];
 let holdSession = true;
 function releaseSession() {
@@ -34,9 +35,11 @@ const server = createServer((req, res) => {
     res.end(body);
   };
   if (url.pathname === '/api/session') {
-    const reply = () => send(JSON.stringify(signedIn
-      ? { authenticated: true, configured: true, profile: { id: mina, displayName: 'Mina Chen the Very Long Chess Name', hasPortrait: true } }
-      : { authenticated: false, configured: true, profile: null }));
+    const reply = () => send(JSON.stringify(!signedIn
+      ? { authenticated: false, configured: true, profile: null, master: null }
+      : accountMode === 'master'
+        ? { authenticated: true, configured: true, profile: null, master: { displayName: 'Ada Lovelace the Very Long Master Name', avatarUrl: '', avatarType: null } }
+        : { authenticated: true, configured: true, profile: { id: mina, displayName: 'Mina Chen the Very Long Chess Name', hasPortrait: false }, master: { displayName: 'Hidden Master', avatarUrl: 'http://evil.example/secret.png', avatarType: null } }));
     if (holdSession) sessionWaiters.push(reply);
     else reply();
     return;
@@ -126,6 +129,36 @@ try {
   await shot(page, 'account_signed_out_phone.png');
 
   signedIn = true;
+  accountMode = 'master';
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#account-menu-button');
+  const master = await page.$eval('#account-menu-button', (node) => ({
+    label: node.getAttribute('aria-label'),
+    name: node.querySelector('.account-name').textContent,
+    initials: node.querySelector('.account-avatar').textContent
+  }));
+  assert.equal(master.label, 'Ada Lovelace the Very Long Master Name');
+  assert.equal(master.name, master.label);
+  assert.equal(master.initials, 'AN');
+  assert.equal(await page.evaluate(() => document.body.innerText.includes('Hidden Master')), false);
+  assert.equal(await page.$eval('.account-name', (node) => node.scrollWidth > node.clientWidth), true);
+  box = await layout(page);
+  assert.equal(box.overlap, false, JSON.stringify(box));
+  await page.evaluate(() => document.getElementById('account-menu-button').click());
+  await page.waitForSelector('#account-master');
+  assert.equal(await page.$eval('#account-join', (node) => node.textContent), 'Join Chess');
+  assert.equal(await page.$eval('#account-master', (node) => node.getAttribute('href')), 'https://theworldgovernmentincorporated.com/account/');
+  assert.equal(await page.$eval('#account-log-out', (node) => node.textContent), 'Log out');
+  assert.equal(await page.$('#account-profile'), null);
+  await shot(page, 'account_master_desktop.png');
+  await page.setViewport({ width: 390, height: 844 });
+  box = await layout(page);
+  assert.equal(box.overlap, false, JSON.stringify(box));
+  assert.ok(box.slotRight <= 391);
+  await shot(page, 'account_master_phone.png');
+
+  accountMode = 'chess';
   await page.setViewport({ width: 1280, height: 900 });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#account-menu-button');
@@ -141,11 +174,14 @@ try {
   assert.ok(await page.$eval('.account-name', (node) => node.scrollWidth > node.clientWidth));
   box = await layout(page);
   assert.equal(box.overlap, false, JSON.stringify(box));
-  await shot(page, 'account_signed_in_desktop.png');
+  assert.equal(await page.evaluate(() => document.body.innerText.includes('Hidden Master')), false);
   await page.evaluate(() => document.getElementById('account-menu-button').click());
   await page.waitForSelector('#account-profile');
+  assert.equal(await page.$eval('#account-profile', (node) => node.textContent), 'Account');
   assert.equal(await page.$eval('#account-profile', (node) => node.getAttribute('href')), '/community/profile/?id=' + mina);
-  await page.evaluate(() => document.getElementById('account-sign-out').click());
+  assert.equal(await page.$eval('#account-log-out', (node) => node.textContent), 'Log out');
+  await shot(page, 'account_chess_desktop.png');
+  await page.evaluate(() => document.getElementById('account-log-out').click());
   await page.waitForSelector('#account-sign-in');
   assert.equal(await page.$eval('#account-sign-in', (node) => node.textContent), 'Sign in');
 
@@ -159,7 +195,17 @@ try {
   assert.equal(box.overlap, false, JSON.stringify(box));
   assert.ok(box.slotRight <= 391);
   assert.equal(await page.$eval('#account-menu-button', (node) => node.getAttribute('aria-label')), 'Mina Chen the Very Long Chess Name');
-  await shot(page, 'account_signed_in_phone.png');
+  await shot(page, 'account_chess_phone.png');
+  await page.evaluate(async () => {
+    const stage = await import('/assets/chess/game-stage.js');
+    stage.syncGameStage({ label: 'Leave', confirm: 'Leave this game?', yesLabel: 'Leave', onConfirm() {} });
+  });
+  await page.waitForFunction(() => document.body.classList.contains('game-stage') && !document.getElementById('account-slot'));
+  await page.evaluate(async () => {
+    const stage = await import('/assets/chess/game-stage.js');
+    stage.closeGameStage();
+  });
+  await page.waitForSelector('#account-menu-button');
   assert.equal(errors.length, 0, errors.join('\n'));
   console.log('account menu browser tests passed');
 } finally {
