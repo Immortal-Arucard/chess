@@ -26,6 +26,7 @@ function fileFor(urlPath) {
   return full;
 }
 
+const portraitRequests = [];
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   const signedOut = String(req.headers.cookie || '').includes('chess_test_mode=out');
@@ -41,6 +42,7 @@ const server = createServer((req, res) => {
   const postsMatch = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/posts$/i);
   const imageMatch = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/(portrait|background)$/i);
   if (imageMatch) {
+    portraitRequests.push(url.pathname);
     if (imageMatch[1].toLowerCase() !== ada) {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end('{}');
@@ -185,6 +187,10 @@ try {
   await page.click('#your-profile');
   await page.waitForFunction(() => location.pathname.indexOf('/community/profile') === 0);
   await page.waitForFunction(() => document.body.innerText.includes('Newest note'));
+  await page.waitForFunction(() => {
+    const image = document.querySelector('.profile-portrait img');
+    return image && image.complete && image.naturalWidth > 0;
+  });
   let info = await layout();
   assertImmersive(info, 'desktop profile');
   assert.match(info.text, /Ada Lovelace/);
@@ -202,7 +208,9 @@ try {
   }));
   assert.equal(card.bio, '<script>alert(1)</script>');
   assert.equal(card.scripts <= 2, true);
-  assert.match(card.portrait, /^\/api\/profiles\/.*\/portrait/);
+  assert.equal(portraitRequests.filter((path) => path === '/api/profiles/' + ada + '/portrait').length, 1);
+  assert.equal(/^blob:http:\/\/127\.0\.0\.1:\d+\//.test(card.portrait) || /^\/api\/profiles\/.*\/portrait/.test(card.portrait), true);
+  assert.equal(/^https?:\/\//.test(card.portrait), false);
   assert.match(card.background, /\/background/);
   assert.equal(card.files, true);
   assert.ok(card.bannerHeight >= 140);
