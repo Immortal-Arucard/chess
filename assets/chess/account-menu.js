@@ -1,13 +1,11 @@
 import { createChessGateway } from './community-gateway.js';
 import { portraitFor } from './author-avatar.js';
-import { cleanEmail, cleanName, profilePath, LIMITS } from './community-model.js';
+import { cleanEmail, cleanName, LIMITS } from './community-model.js';
+import { chessSection } from './chess-section.js';
+import { resolveAccountLook } from '../section-account.js';
 
 export function sessionView(body) {
-  if (!body || body.authenticated !== true) return { state: 'signed-out' };
-  const profile = body.profile;
-  if (!profile || typeof profile.id !== 'string' || !profile.id) return { state: 'needs-profile' };
-  const name = typeof profile.displayName === 'string' && profile.displayName.trim() ? profile.displayName.trim() : 'Member';
-  return { state: 'signed-in', id: profile.id, name, hasPortrait: !!profile.hasPortrait };
+  return resolveAccountLook(chessSection, body);
 }
 
 function el(tag, className, text) {
@@ -60,7 +58,7 @@ export function mountAccountMenu(slot, gateway) {
       slot.append(placeholder());
       return;
     }
-    if (view.state === 'signed-out') slot.append(signedOutControl());
+    if (view.kind === 'signed-out') slot.append(signedOutControl());
     else slot.append(signedInControl());
     if (dialogOpen) slot.append(dialog());
   }
@@ -88,11 +86,11 @@ export function mountAccountMenu(slot, gateway) {
     button.id = 'account-menu-button';
     button.setAttribute('aria-expanded', menuOpen ? 'true' : 'false');
     button.setAttribute('aria-controls', 'account-menu');
-    const name = view.state === 'signed-in' ? view.name : 'Join Chess';
+    const name = view.name;
     button.setAttribute('aria-label', name);
     const avatar = el('span', 'account-avatar is-absent');
     avatar.setAttribute('aria-hidden', 'true');
-    if (view.state === 'signed-in') paintPortrait(avatar, view.id);
+    paintLook(avatar, view);
     const label = el('span', 'account-name', name);
     button.append(avatar, label);
     button.addEventListener('click', (event) => {
@@ -109,30 +107,57 @@ export function mountAccountMenu(slot, gateway) {
     const panel = el('div', 'account-menu');
     panel.id = 'account-menu';
     panel.setAttribute('role', 'menu');
-    if (view.state === 'signed-in') {
-      const profile = document.createElement('a');
-      profile.className = 'account-menu-item';
-      profile.href = profilePath(view.id);
-      profile.id = 'account-profile';
-      profile.setAttribute('role', 'menuitem');
-      profile.textContent = 'Profile';
-      panel.append(profile);
-    } else {
-      const join = document.createElement('a');
-      join.className = 'account-menu-item';
-      join.href = '/community/';
-      join.id = 'account-join';
-      join.setAttribute('role', 'menuitem');
-      join.textContent = 'Join Chess';
-      panel.append(join);
-    }
-    const out = el('button', 'account-menu-item', 'Sign out');
-    out.type = 'button';
-    out.id = 'account-sign-out';
-    out.setAttribute('role', 'menuitem');
-    out.addEventListener('click', () => { void signOut(); });
-    panel.append(out);
+    (view.menu || []).forEach((item) => {
+      if (item.action === 'sign-out') {
+        const out = el('button', 'account-menu-item', item.label);
+        out.type = 'button';
+        out.id = item.id === 'log-out' ? 'account-log-out' : 'account-sign-out';
+        out.setAttribute('role', 'menuitem');
+        out.addEventListener('click', () => { void signOut(); });
+        panel.append(out);
+        return;
+      }
+      const link = document.createElement('a');
+      link.className = 'account-menu-item';
+      link.href = item.href;
+      link.id = item.id === 'join' ? 'account-join' : item.id === 'master-account' ? 'account-master' : 'account-profile';
+      link.setAttribute('role', 'menuitem');
+      link.textContent = item.label;
+      panel.append(link);
+    });
     return panel;
+  }
+
+  function paintLook(avatar, look) {
+    avatar.replaceChildren();
+    if (look.portraitId) {
+      paintPortrait(avatar, look.portraitId);
+      return;
+    }
+    if (look.avatarUrl) {
+      avatar.className = 'account-avatar is-picture';
+      const img = document.createElement('img');
+      img.alt = '';
+      img.width = 28;
+      img.height = 28;
+      img.draggable = false;
+      img.referrerPolicy = 'no-referrer';
+      img.src = look.avatarUrl;
+      img.addEventListener('error', () => {
+        if (!avatar.isConnected) return;
+        avatar.className = 'account-avatar is-initials';
+        avatar.replaceChildren();
+        avatar.textContent = look.initials || '?';
+      });
+      avatar.append(img);
+      return;
+    }
+    if (look.kind === 'master') {
+      avatar.className = 'account-avatar is-initials';
+      avatar.textContent = look.initials || '?';
+      return;
+    }
+    avatar.className = 'account-avatar is-absent';
   }
 
   function dialog() {
@@ -246,7 +271,7 @@ export function mountAccountMenu(slot, gateway) {
       const body = response.ok ? await response.json() : null;
       view = sessionView(body);
     } catch (err) {
-      view = { state: 'signed-out' };
+      view = { kind: 'signed-out' };
     }
     render();
   }

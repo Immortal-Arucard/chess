@@ -1,4 +1,4 @@
-const CACHE = 'chess-v18';
+const CACHE = 'chess-v19';
 const ROUTES = [
   '/',
   '/theory/',
@@ -42,6 +42,9 @@ const ASSETS = [
   '/assets/site.css',
   '/assets/site.js',
   '/assets/chess/account-menu.js',
+  '/assets/chess/chess-section.js',
+  '/assets/master-account.js',
+  '/assets/section-account.js',
   '/assets/chess/rules.js',
   '/assets/chess/engine.js',
   '/assets/chess/board.js',

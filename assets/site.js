@@ -168,7 +168,7 @@
   });
 })();
 
-import('/assets/chess/account-menu.js?v=18').catch(function () { /* the header stays usable without the account control */ });
+import('/assets/chess/account-menu.js?v=19').catch(function () { /* the header stays usable without the account control */ });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', function (event) {
