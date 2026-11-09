@@ -120,6 +120,15 @@ function publicError(error) {
   return 'The request could not be completed.';
 }
 
+function imageBytes(value) {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === 'string' && value.startsWith('\\x') && /^\\x[0-9a-fA-F]*$/.test(value) && value.length % 2 === 0) {
+    return Buffer.from(value.slice(2), 'hex');
+  }
+  return null;
+}
+
 async function readBounded(req, max) {
   const chunks = [];
   let size = 0;
@@ -231,17 +240,18 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (req.method === 'GET' && profileImage) {
         const result = await query('select mime, bytes from chess_service.profile_image($1, $2)', [profileImage[1], profileImage[2]]);
         const image = result.rows[0];
-        if (!image || !image.bytes || !['image/jpeg', 'image/png', 'image/webp'].includes(image.mime)) {
+        const bytes = imageBytes(image && image.bytes);
+        if (!bytes || !bytes.length || !['image/jpeg', 'image/png', 'image/webp'].includes(image && image.mime)) {
           return send(404, { error: 'That profile was not found.' });
         }
         res.writeHead(200, {
           'content-type': image.mime,
-          'content-length': image.bytes.length,
+          'content-length': bytes.length,
           'cache-control': 'no-store',
           'x-content-type-options': 'nosniff',
           'referrer-policy': 'no-referrer'
         });
-        res.end(image.bytes);
+        res.end(bytes);
         return;
       }
       if (req.method === 'GET' && profileMatch) {
