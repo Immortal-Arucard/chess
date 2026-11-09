@@ -15,6 +15,7 @@ mkdirSync(shotDir, { recursive: true });
 const ada = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const missing = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const empty = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const bad = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css;charset=utf-8', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 
@@ -43,6 +44,11 @@ const server = createServer((req, res) => {
   const imageMatch = url.pathname.match(/^\/api\/profiles\/([0-9a-f-]{36})\/(portrait|background)$/i);
   if (imageMatch) {
     portraitRequests.push(url.pathname);
+    if (imageMatch[1].toLowerCase() === bad && imageMatch[2] === 'portrait') {
+      res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      res.end(Buffer.from('not-a-real-jpeg-file'));
+      return;
+    }
     if (imageMatch[1].toLowerCase() !== ada) {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end('{}');
@@ -54,14 +60,16 @@ const server = createServer((req, res) => {
   }
   if (profileMatch) {
     const id = profileMatch[1].toLowerCase();
-    if (id !== ada && id !== empty) {
+    if (id !== ada && id !== empty && id !== bad) {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: 'That profile was not found.' }));
       return;
     }
     const card = id === ada
       ? { id: ada, displayName: 'Ada Lovelace', createdAt: '2026-11-08T00:00:00.000Z', bio: '<script>alert(1)</script>', hasPortrait: true, hasBackground: true }
-      : { id: empty, displayName: 'Empty Board', createdAt: '2026-11-08T00:00:00.000Z', bio: '', hasPortrait: false, hasBackground: false };
+      : id === bad
+        ? { id: bad, displayName: 'Broken Frame', createdAt: '2026-11-08T00:00:00.000Z', bio: 'The large picture could not be decoded.', hasPortrait: true, hasBackground: false }
+        : { id: empty, displayName: 'Empty Board', createdAt: '2026-11-08T00:00:00.000Z', bio: '', hasPortrait: false, hasBackground: false };
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify(card));
     return;
@@ -72,7 +80,9 @@ const server = createServer((req, res) => {
           { id: 'post-1', authorId: ada, authorName: 'Ada Lovelace', body: 'Older note', createdAt: '2026-11-08T00:00:00.000Z' },
           { id: 'post-2', authorId: ada, authorName: 'Ada Lovelace', body: 'Newest note', createdAt: '2026-11-08T00:00:00.000Z' }
         ]
-      : [];
+      : postsMatch[1].toLowerCase() === bad
+        ? [{ id: 'post-bad', authorId: bad, authorName: 'Broken Frame', body: 'The picture did not survive.', createdAt: '2026-11-08T00:00:00.000Z' }]
+        : [];
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ posts }));
     return;
@@ -107,6 +117,11 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + server.address().port;
 const browser = await puppeteer.launch({ executablePath: chromePath, headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const page = await browser.newPage();
+const seenPortraits = [];
+page.on('request', (request) => {
+  const parsed = new URL(request.url());
+  if (parsed.pathname.endsWith('/portrait')) seenPortraits.push(parsed);
+});
 
 async function layout() {
   return page.evaluate(() => {
@@ -208,9 +223,29 @@ try {
   }));
   assert.equal(card.bio, '<script>alert(1)</script>');
   assert.equal(card.scripts <= 2, true);
+  const adaPortraits = seenPortraits.filter((parsed) => parsed.pathname === '/api/profiles/' + ada + '/portrait');
+  assert.equal(adaPortraits.length, 1);
+  assert.equal(adaPortraits[0].origin, new URL(page.url()).origin);
   assert.equal(portraitRequests.filter((path) => path === '/api/profiles/' + ada + '/portrait').length, 1);
-  assert.equal(/^blob:http:\/\/127\.0\.0\.1:\d+\//.test(card.portrait) || /^\/api\/profiles\/.*\/portrait/.test(card.portrait), true);
-  assert.equal(/^https?:\/\//.test(card.portrait), false);
+  const decoded = await page.evaluate(async (encoded) => {
+    const shown = document.querySelector('.profile-portrait img');
+    const reference = new Image();
+    reference.src = 'data:image/png;base64,' + encoded;
+    await reference.decode();
+    const pixel = (image) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0);
+      return Array.from(context.getImageData(0, 0, image.naturalWidth, image.naturalHeight).data);
+    };
+    return { width: shown.naturalWidth, height: shown.naturalHeight, shown: pixel(shown), reference: pixel(reference) };
+  }, png.toString('base64'));
+  assert.equal(decoded.width, 1);
+  assert.equal(decoded.height, 1);
+  assert.deepEqual(decoded.shown, decoded.reference);
+  assert.equal(card.portrait.startsWith('blob:' + adaPortraits[0].origin + '/'), true);
   assert.match(card.background, /\/background/);
   assert.equal(card.files, true);
   assert.ok(card.bannerHeight >= 140);
@@ -234,6 +269,10 @@ try {
   info = await layout();
   assertImmersive(info, 'mobile reload');
 
+  await page.goto(origin + '/community/profile/?id=' + bad, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.body.innerText.includes('Profile picture unavailable') && document.body.innerText.includes('The picture did not survive.'));
+  assert.equal(await page.$('.profile-portrait img'), null);
+  assert.equal(await page.$eval('.author-avatar', (node) => node.className), 'author-avatar is-unavailable');
   await page.goto(origin + '/community/profile/?id=' + empty, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.body.innerText.includes('No profile picture yet') && document.body.innerText.includes('No background image yet') && document.body.innerText.includes('No bio yet.'));
   assert.equal(await page.$('#portrait-file'), null);

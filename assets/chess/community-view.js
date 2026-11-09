@@ -1,6 +1,6 @@
 import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
 import { prepareProfileImage } from './profile-picture.js';
-import { authorChip, forgetAuthorPortrait, portraitFor } from './author-avatar.js';
+import { authorChip, elementShown, forgetAuthorPortrait, markPortraitUnavailable, portraitFor } from './author-avatar.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -717,9 +717,17 @@ export function mountProfile(root, options) {
       img.alt = person.displayName;
       portrait.append(img);
       portraitFor(person.id).then((result) => {
-        if (!img.parentNode) return;
-        if (result.status === 'image' && result.url) img.src = result.url;
-        else portrait.replaceChildren(el('p', 'profile-empty', result.status === 'absent' ? 'No profile picture yet' : 'Profile picture unavailable'));
+        if (!elementShown(img) || !result || result.status === 'stale') return;
+        if (result.status === 'image' && result.url) {
+          img.addEventListener('error', () => {
+            markPortraitUnavailable(person.id, result.url);
+            if (!elementShown(portrait)) return;
+            portrait.replaceChildren(el('p', 'profile-empty', 'Profile picture unavailable'));
+          });
+          img.src = result.url;
+          return;
+        }
+        portrait.replaceChildren(el('p', 'profile-empty', result.status === 'absent' ? 'No profile picture yet' : 'Profile picture unavailable'));
       });
     } else {
       portrait.append(el('p', 'profile-empty', 'No profile picture yet'));
