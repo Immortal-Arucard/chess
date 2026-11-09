@@ -13,14 +13,17 @@
 <meta name="apple-mobile-web-app-title" content="Chess">
 <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
-<link rel="stylesheet" href="/assets/site.css?v=19">
+<link rel="stylesheet" href="/assets/site.css?v=20">
 <link rel="stylesheet" href="/assets/chess/community.css">
 </head>
 <body class="profile-page">
 <a class="skip" href="#main">Skip to content</a>
 <div class="profile-frame">
   <div class="profile-exitbar">
-    <a class="profile-exit" href="/community/">Exit profile</a>
+    <div class="profile-exitrow">
+      <a class="profile-exit" href="/community/">Exit profile</a>
+      <header class="site-header profile-account-header"><div class="site-bar"></div></header>
+    </div>
     <a class="profile-back" href="/community/">Back to Community</a>
   </div>
   <main class="profile-main" id="main">
@@ -31,6 +34,7 @@
   </main>
 </div>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'});</script>
-<script type="module" src="/assets/chess/community-app.js?v=19"></script>
+<script src="/assets/site.js?v=20"></script>
+<script type="module" src="/assets/chess/community-app.js?v=20"></script>
 </body>
 </html>
