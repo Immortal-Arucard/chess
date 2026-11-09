@@ -1,4 +1,4 @@
-const CACHE = 'chess-v8';
+const CACHE = 'chess-v9';
 const ROUTES = [
   '/',
   '/theory/',
@@ -50,6 +50,7 @@ const ASSETS = [
   '/assets/chess/community-config.js',
   '/assets/chess/community-model.js',
   '/assets/chess/community-view.js',
+  '/assets/chess/profile-picture.js',
   '/assets/chess/community-gateway.js',
   '/assets/chess/community-app.js',
   '/bot/bot.js',

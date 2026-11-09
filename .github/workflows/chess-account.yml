@@ -38,6 +38,7 @@ jobs:
       - run: node assets/chess/community-model.test.mjs
       - run: node assets/chess/discussion-room.test.mjs
       - run: node server/profile-image.test.mjs
+      - run: node assets/chess/profile-picture.test.mjs
       - run: node server/game-record.test.mjs
       - run: node server/supabase-auth.test.mjs
       - run: node server/worker.test.mjs
@@ -58,5 +59,8 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: node server/profile-upload.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/community-offline.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome
