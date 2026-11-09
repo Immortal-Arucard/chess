@@ -31,7 +31,7 @@ jobs:
           node-version: 22
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: |
-          curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt-get install -y /tmp/chrome.deb
       - run: npm install --prefix server
       - run: node assets/chess/bot-results.test.mjs
