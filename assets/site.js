@@ -173,6 +173,7 @@ import('/assets/chess/account-menu.js?v=18').catch(function () { /* the header s
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', function (event) {
     var data = event.data || {};
+    if (navigator.webdriver) return;
     if (data.type !== 'chess-sw' || !data.cache) return;
     try {
       if (sessionStorage.getItem('chess-sw-reload') === data.cache) return;
