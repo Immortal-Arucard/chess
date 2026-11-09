@@ -79,3 +79,10 @@ jobs:
       - run: node server/game-stage.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/roster.workerd.test.mjs
+        env:
+          CI: "1"
+          WRANGLER_SEND_METRICS: "false"
+      - run: node server/roster.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

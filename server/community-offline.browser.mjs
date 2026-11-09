@@ -39,7 +39,8 @@ page.on('requestfailed', (request) => {
 const screens = [
   '/community/',
   '/community/discussion/',
-  '/community/profile/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  '/community/profile/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  '/community/roster/'
 ];
 try {
   await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
@@ -49,19 +50,21 @@ try {
     cached = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration || !registration.active) return false;
-      const cache = await caches.open('chess-v12');
+      const cache = await caches.open('chess-v13');
       const keys = await cache.keys();
       return keys.some((key) => key.url.endsWith('/assets/chess/profile-picture.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/author-avatar.js'))
         && keys.some((key) => key.url.endsWith('/human/human.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/human-rules.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/game-stage.js'))
-        && keys.some((key) => key.url.endsWith('/assets/chess/community-view.js'));
+        && keys.some((key) => key.url.endsWith('/assets/chess/community-view.js'))
+        && keys.some((key) => key.url.endsWith('/assets/chess/roster.js'))
+        && keys.some((key) => key.url.endsWith('/community/roster/'));
     });
     if (cached) break;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  assert.equal(cached, true, 'chess-v12 did not precache the game scripts');
+  assert.equal(cached, true, 'chess-v13 did not precache the roster');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.setOfflineMode(true);
   for (const path of screens) {
@@ -70,15 +73,15 @@ try {
     const shown = await page.evaluate(async () => {
       const deadline = Date.now() + 8000;
       while (Date.now() < deadline) {
-        const app = document.getElementById('community-app');
+        const app = document.getElementById('roster-app') || document.getElementById('community-app');
         const text = app ? app.textContent : '';
-        if (text && (text.includes('could not be reached') || text.includes('Not configured') || text.includes('Discussion'))) return text;
+        if (text && (text.includes('could not be reached') || text.includes('needs a connection') || text.includes('Not configured') || text.includes('Discussion'))) return text;
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
-      const app = document.getElementById('community-app');
+      const app = document.getElementById('roster-app') || document.getElementById('community-app');
       return app ? app.textContent : document.body.innerText.slice(0, 300);
     });
-    assert.match(shown, /could not be reached/, path + ' showed: ' + shown);
+    assert.match(shown, path === '/community/roster/' ? /needs a connection/ : /could not be reached/, path + ' showed: ' + shown);
     const moduleResponse = await page.evaluate(async () => {
       const picture = await fetch('/assets/chess/profile-picture.js');
       const avatar = await fetch('/assets/chess/author-avatar.js');

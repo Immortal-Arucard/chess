@@ -81,6 +81,7 @@ function publicError(error) {
     'This account is suspended.',
     'Join Chess before doing that.',
     'A discussion message must be 1 to 1000 characters.',
+    'A name search can be at most 40 characters.',
     'You can discuss only as your own Chess profile.',
     'You can edit only your own Chess profile.',
     'A bio can be at most 280 characters.',
@@ -234,6 +235,23 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const result = await query('select chess_service.chess_session($1) as session', [token]);
         const session = result.rows[0].session;
         return send(200, Object.assign({ configured: true }, session));
+      }
+      if (req.method === 'GET' && url.pathname === '/api/community/roster') {
+        const requested = Number(url.searchParams.get('limit') || 24);
+        const limit = Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 30) : 24;
+        const result = await query(
+          'select chess_service.community_roster($1, $2, $3, $4, $5, $6, $7) as roster',
+          [
+            url.searchParams.get('q') || '',
+            url.searchParams.get('sort') || 'name',
+            url.searchParams.get('beforeName') || null,
+            url.searchParams.get('before') || null,
+            url.searchParams.get('beforeId') || null,
+            limit,
+            clientIp(req)
+          ]
+        );
+        return send(200, result.rows[0].roster);
       }
       if (req.method === 'GET' && url.pathname === '/api/discussion') {
         const result = await query('select chess_service.discussion_page($1, $2, $3, $4, $5) as messages', [
