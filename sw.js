@@ -43,6 +43,7 @@ const ASSETS = [
   '/assets/site.js',
   '/assets/chess/account-menu.js',
   '/assets/chess/chess-section.js',
+  '/assets/account-sections.js',
   '/assets/master-account.js',
   '/assets/section-account.js',
   '/assets/chess/rules.js',

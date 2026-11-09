@@ -5,7 +5,12 @@ import { chessSection } from './chess-section.js';
 import { resolveAccountLook } from '../section-account.js';
 
 export function sessionView(body) {
-  return resolveAccountLook(chessSection, body);
+  const hostname = typeof location === 'undefined' ? '' : location.hostname;
+  return resolveAccountLook(chessSection, {
+    signedIn: !!(body && body.authenticated === true),
+    user: {},
+    master: body && body.master
+  }, hostname);
 }
 
 function el(tag, className, text) {
@@ -111,7 +116,7 @@ export function mountAccountMenu(slot, gateway) {
       if (item.action === 'sign-out') {
         const out = el('button', 'account-menu-item', item.label);
         out.type = 'button';
-        out.id = item.id === 'log-out' ? 'account-log-out' : 'account-sign-out';
+        out.id = 'account-log-out';
         out.setAttribute('role', 'menuitem');
         out.addEventListener('click', () => { void signOut(); });
         panel.append(out);
@@ -120,7 +125,7 @@ export function mountAccountMenu(slot, gateway) {
       const link = document.createElement('a');
       link.className = 'account-menu-item';
       link.href = item.href;
-      link.id = item.id === 'join' ? 'account-join' : item.id === 'master-account' ? 'account-master' : 'account-profile';
+      link.id = item.href === '/community/' ? 'account-join' : String(item.href || '').includes('/account/') ? 'account-master' : 'account-profile';
       link.setAttribute('role', 'menuitem');
       link.textContent = item.label;
       panel.append(link);
@@ -128,10 +133,21 @@ export function mountAccountMenu(slot, gateway) {
     return panel;
   }
 
+  function chessPortraitId(url) {
+    if (!url || url.charAt(0) !== '/') return '';
+    let parsed;
+    try { parsed = new URL(url, 'https://chess.theworldgovernmentincorporated.com'); }
+    catch (err) { return ''; }
+    if (parsed.pathname !== '/community/profile/') return '';
+    const id = parsed.searchParams.get('id') || '';
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : '';
+  }
+
   function paintLook(avatar, look) {
     avatar.replaceChildren();
-    if (look.portraitId) {
-      paintPortrait(avatar, look.portraitId);
+    const portraitId = look.avatarUrl ? '' : chessPortraitId(look.url);
+    if (portraitId) {
+      paintPortrait(avatar, portraitId);
       return;
     }
     if (look.avatarUrl) {
@@ -269,7 +285,7 @@ export function mountAccountMenu(slot, gateway) {
     try {
       const response = await fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' });
       const body = response.ok ? await response.json() : null;
-      view = sessionView(body);
+      view = await sessionView(body);
     } catch (err) {
       view = { kind: 'signed-out' };
     }

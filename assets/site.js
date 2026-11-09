@@ -168,7 +168,14 @@
   });
 })();
 
-import('/assets/chess/account-menu.js?v=19').catch(function () { /* the header stays usable without the account control */ });
+function startAccountMenu() {
+  import('/assets/chess/account-menu.js?v=19').catch(function () { /* the header stays usable without the account control */ });
+}
+var sectionRegistry = document.createElement('script');
+sectionRegistry.src = '/assets/account-sections.js?v=19';
+sectionRegistry.onload = startAccountMenu;
+sectionRegistry.onerror = startAccountMenu;
+document.body.appendChild(sectionRegistry);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', function (event) {

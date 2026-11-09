@@ -1,8 +1,15 @@
-// Owner-only master account look. This file does not know about Chess.
-// Copy it into another sub-site and pass that site's section descriptor
-// to resolveAccountLook in section-account.js.
+// Owner-only master account links and avatar helpers. This file does not
+// know about Chess. On the master host, /login/ and /account/ stay
+// same-origin. Every other host prefixes them with the master origin.
 
-export const MASTER_ACCOUNT_HREF = 'https://theworldgovernmentincorporated.com/account/';
+export const MASTER_ORIGIN = 'https://theworldgovernmentincorporated.com';
+export const MASTER_ACCOUNT_HREF = MASTER_ORIGIN + '/account/';
+export const MASTER_LOGIN_HREF = MASTER_ORIGIN + '/login/';
+
+export function masterHref(path, hostname) {
+  if (hostname === 'theworldgovernmentincorporated.com') return path;
+  return MASTER_ORIGIN + path;
+}
 
 export function httpsUrl(value) {
   try {
@@ -28,12 +35,4 @@ export function masterLook(master) {
     avatarUrl: httpsUrl(master && master.avatarUrl),
     initials: initials(name)
   };
-}
-
-export function masterMenu(joinItem) {
-  const items = [];
-  if (joinItem && joinItem.label && joinItem.href) items.push({ id: 'join', label: String(joinItem.label), href: String(joinItem.href) });
-  items.push({ id: 'master-account', label: 'Master account', href: MASTER_ACCOUNT_HREF });
-  items.push({ id: 'log-out', label: 'Log out', action: 'sign-out' });
-  return items;
 }

@@ -177,9 +177,11 @@ try {
   assert.equal(await page.evaluate(() => document.body.innerText.includes('Hidden Master')), false);
   await page.evaluate(() => document.getElementById('account-menu-button').click());
   await page.waitForSelector('#account-profile');
+  assert.equal(await page.$eval('#account-profile', (node) => node.textContent), 'Account');
   assert.equal(await page.$eval('#account-profile', (node) => node.getAttribute('href')), '/community/profile/?id=' + mina);
+  assert.equal(await page.$eval('#account-log-out', (node) => node.textContent), 'Log out');
   await shot(page, 'account_chess_desktop.png');
-  await page.evaluate(() => document.getElementById('account-sign-out').click());
+  await page.evaluate(() => document.getElementById('account-log-out').click());
   await page.waitForSelector('#account-sign-in');
   assert.equal(await page.$eval('#account-sign-in', (node) => node.textContent), 'Sign in');
 
