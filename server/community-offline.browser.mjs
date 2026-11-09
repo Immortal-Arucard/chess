@@ -49,15 +49,16 @@ try {
     cached = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration || !registration.active) return false;
-      const cache = await caches.open('chess-v9');
+      const cache = await caches.open('chess-v10');
       const keys = await cache.keys();
       return keys.some((key) => key.url.endsWith('/assets/chess/profile-picture.js'))
+        && keys.some((key) => key.url.endsWith('/assets/chess/author-avatar.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/community-view.js'));
     });
     if (cached) break;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  assert.equal(cached, true, 'chess-v9 did not precache profile-picture.js');
+  assert.equal(cached, true, 'chess-v10 did not precache author-avatar.js');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.setOfflineMode(true);
   for (const path of screens) {
@@ -76,12 +77,16 @@ try {
     });
     assert.match(shown, /could not be reached/, path + ' showed: ' + shown);
     const moduleResponse = await page.evaluate(async () => {
-      const response = await fetch('/assets/chess/profile-picture.js');
-      return { ok: response.ok, text: (await response.text()).includes('prepareProfileImage') };
+      const picture = await fetch('/assets/chess/profile-picture.js');
+      const avatar = await fetch('/assets/chess/author-avatar.js');
+      return {
+        ok: picture.ok && avatar.ok,
+        text: (await picture.text()).includes('prepareProfileImage') && (await avatar.text()).includes('authorChip')
+      };
     });
     assert.equal(moduleResponse.ok, true, path);
     assert.equal(moduleResponse.text, true, path);
-    assert.equal(errors.some((item) => item.includes('profile-picture') || item.includes('/assets/chess/')), false, path + ' ' + errors.join('\n'));
+    assert.equal(errors.some((item) => item.includes('profile-picture') || item.includes('author-avatar') || item.includes('/assets/chess/')), false, path + ' ' + errors.join('\n'));
   }
   console.log('offline community screens loaded profile-picture.js');
 } finally {
