@@ -1,5 +1,7 @@
 import { createServer } from 'node:https';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Agent } from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -98,9 +100,14 @@ try {
 }
 
 const keys = webpush.generateVAPIDKeys();
+const certDir = mkdtempSync(join(tmpdir(), 'chess-push-'));
+const keyPath = join(certDir, 'key.pem');
+const certPath = join(certDir, 'cert.pem');
+const made = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-keyout', keyPath, '-out', certPath, '-days', '1', '-nodes', '-subj', '/CN=127.0.0.1']);
+if (made.status !== 0) throw new Error(made.stderr && made.stderr.toString());
 const server = createServer({
-  key: readFileSync('/tmp/chess-push-key.pem'),
-  cert: readFileSync('/tmp/chess-push-cert.pem')
+  key: readFileSync(keyPath),
+  cert: readFileSync(certPath)
 }, (req, res) => {
   res.writeHead(410);
   res.end('gone');
