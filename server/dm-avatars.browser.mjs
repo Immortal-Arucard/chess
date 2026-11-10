@@ -79,6 +79,14 @@ try {
   const client = await page.createCDPSession();
   await client.send('Network.setBypassServiceWorker', { bypass: true });
   await page.setViewport({ width: 1280, height: 900 });
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (request.url() === 'https://cdn.example/mina.png') {
+      request.respond({ status: 200, contentType: 'image/png', body: png });
+      return;
+    }
+    request.continue();
+  });
   await page.goto(origin + '/community/messages/?with=' + julian, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.message-line').length === 4);
   await page.waitForFunction(() => {
