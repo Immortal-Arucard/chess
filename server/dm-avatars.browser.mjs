@@ -82,8 +82,8 @@ try {
   await page.goto(origin + '/community/messages/?with=' + julian, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.message-line').length === 4);
   await page.waitForFunction(() => {
-    const lines = [...document.querySelectorAll('.message-line')];
-    return lines.every((line) => !line.querySelector('.author-avatar.is-pending'));
+    const nodes = [...document.querySelectorAll('.message-line .author-avatar')];
+    return nodes.length === 4 && nodes.every((node) => node.classList.contains('is-picture'));
   });
   const desktop = await measure(page);
   assert.equal(desktop.count, 4);
