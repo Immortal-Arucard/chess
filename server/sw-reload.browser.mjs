@@ -60,7 +60,7 @@ const origin = 'http://127.0.0.1:' + server.address().port;
 const browser = await puppeteer.launch({ executablePath: chromePath, headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 try {
   const page = await browser.newPage();
-  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v22'));
+  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v23'));
   await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
   const deadline = Date.now() + 15000;
   let active = false;
@@ -77,7 +77,7 @@ try {
   generation = 'fresh';
   const seen = shellRequests.length;
   const text = await page.evaluate(async () => {
-    const response = await fetch('/assets/site.js?v=22');
+    const response = await fetch('/assets/site.js?v=23');
     return response.text();
   });
   assert.match(text, /__CHESS_SHELL="fresh"/);
