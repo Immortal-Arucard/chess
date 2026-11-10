@@ -1,0 +1,1411 @@
+{
+  "generatedAt": "2026-11-10T05:04:00Z",
+  "currency": "AMU",
+  "simulated": true,
+  "live": false,
+  "disclaimer": "Simulated, not real money. Reference ratings are stored snapshots or cached public lists, not live quotes. Market prices are separate simulated AMU prices.",
+  "markets": [
+    {
+      "id": "fide:standard",
+      "source": "fide",
+      "category": "standard",
+      "title": "FIDE Standard",
+      "ratingLabel": "FIDE Standard rating",
+      "referenceKind": "snapshot",
+      "referenceSource": "ChessBase publication of the FIDE standard list, 2 November 2026",
+      "asOf": "2026-11-01T00:00:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "CARLSEN",
+          "name": "Magnus Carlsen",
+          "externalRef": "fide:magnus-carlsen",
+          "rating": 2823
+        },
+        {
+          "symbol": "NAKAMURA",
+          "name": "Hikaru Nakamura",
+          "externalRef": "fide:hikaru-nakamura",
+          "rating": 2792
+        },
+        {
+          "symbol": "CARUANA",
+          "name": "Fabiano Caruana",
+          "externalRef": "fide:fabiano-caruana",
+          "rating": 2783
+        },
+        {
+          "symbol": "SINDAROV",
+          "name": "Javokhir Sindarov",
+          "externalRef": "fide:javokhir-sindarov",
+          "rating": 2782
+        },
+        {
+          "symbol": "ABDUSATTOROV",
+          "name": "Nodirbek Abdusattorov",
+          "externalRef": "fide:nodirbek-abdusattorov",
+          "rating": 2772
+        },
+        {
+          "symbol": "SO",
+          "name": "Wesley So",
+          "externalRef": "fide:wesley-so",
+          "rating": 2771
+        },
+        {
+          "symbol": "PRAGG",
+          "name": "Praggnanandhaa R",
+          "externalRef": "fide:praggnanandhaa-r",
+          "rating": 2763
+        },
+        {
+          "symbol": "WEI",
+          "name": "Yi Wei",
+          "externalRef": "fide:yi-wei",
+          "rating": 2761
+        },
+        {
+          "symbol": "KEYMER",
+          "name": "Vincent Keymer",
+          "externalRef": "fide:vincent-keymer",
+          "rating": 2761
+        },
+        {
+          "symbol": "FIROUZJA",
+          "name": "Alireza Firouzja",
+          "externalRef": "fide:alireza-firouzja",
+          "rating": 2757
+        },
+        {
+          "symbol": "GIRI",
+          "name": "Anish Giri",
+          "externalRef": "fide:anish-giri",
+          "rating": 2747
+        },
+        {
+          "symbol": "ERIGAISI",
+          "name": "Arjun Erigaisi",
+          "externalRef": "fide:arjun-erigaisi",
+          "rating": 2746
+        },
+        {
+          "symbol": "DUDA",
+          "name": "Jan-Krzysztof Duda",
+          "externalRef": "fide:jan-krzysztof-duda",
+          "rating": 2741
+        },
+        {
+          "symbol": "ANAND",
+          "name": "Viswanathan Anand",
+          "externalRef": "fide:viswanathan-anand",
+          "rating": 2739
+        },
+        {
+          "symbol": "DOMINGUEZ",
+          "name": "Leinier Dominguez Perez",
+          "externalRef": "fide:leinier-dominguez-perez",
+          "rating": 2732
+        },
+        {
+          "symbol": "QUANGLIEM",
+          "name": "Le Quang Liem",
+          "externalRef": "fide:le-quang-liem",
+          "rating": 2732
+        },
+        {
+          "symbol": "DING",
+          "name": "Liren Ding",
+          "externalRef": "fide:liren-ding",
+          "rating": 2723
+        },
+        {
+          "symbol": "TABATABAEI",
+          "name": "M. Amin Tabatabaei",
+          "externalRef": "fide:m-amin-tabatabaei",
+          "rating": 2720
+        },
+        {
+          "symbol": "NIHAL",
+          "name": "Nihal Sarin",
+          "externalRef": "fide:nihal-sarin",
+          "rating": 2720
+        },
+        {
+          "symbol": "ARONIAN",
+          "name": "Levon Aronian",
+          "externalRef": "fide:levon-aronian",
+          "rating": 2719
+        }
+      ]
+    },
+    {
+      "id": "fide:rapid",
+      "source": "fide",
+      "category": "rapid",
+      "title": "FIDE Rapid",
+      "ratingLabel": "FIDE Rapid rating",
+      "referenceKind": "snapshot",
+      "referenceSource": "EloTracker compilation of the November 2026 FIDE rapid list",
+      "asOf": "2026-11-01T00:00:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "CARLSEN",
+          "name": "Magnus Carlsen",
+          "externalRef": "fide:magnus-carlsen",
+          "rating": 2801
+        },
+        {
+          "symbol": "SINDAROV",
+          "name": "Javokhir Sindarov",
+          "externalRef": "fide:javokhir-sindarov",
+          "rating": 2755
+        },
+        {
+          "symbol": "NEPO",
+          "name": "Ian Nepomniachtchi",
+          "externalRef": "fide:ian-nepomniachtchi",
+          "rating": 2748
+        },
+        {
+          "symbol": "ERIGAISI",
+          "name": "Arjun Erigaisi",
+          "externalRef": "fide:arjun-erigaisi",
+          "rating": 2740
+        },
+        {
+          "symbol": "ARONIAN",
+          "name": "Levon Aronian",
+          "externalRef": "fide:levon-aronian",
+          "rating": 2738
+        },
+        {
+          "symbol": "FIROUZJA",
+          "name": "Alireza Firouzja",
+          "externalRef": "fide:alireza-firouzja",
+          "rating": 2737
+        },
+        {
+          "symbol": "PRAGG",
+          "name": "Praggnanandhaa R",
+          "externalRef": "fide:praggnanandhaa-r",
+          "rating": 2733
+        },
+        {
+          "symbol": "NAKAMURA",
+          "name": "Hikaru Nakamura",
+          "externalRef": "fide:hikaru-nakamura",
+          "rating": 2718
+        },
+        {
+          "symbol": "NIHAL",
+          "name": "Nihal Sarin",
+          "externalRef": "fide:nihal-sarin",
+          "rating": 2712
+        },
+        {
+          "symbol": "MVL",
+          "name": "Maxime Vachier-Lagrave",
+          "externalRef": "fide:maxime-vachier-lagrave",
+          "rating": 2712
+        },
+        {
+          "symbol": "ARTEMIEV",
+          "name": "Vladislav Artemiev",
+          "externalRef": "fide:vladislav-artemiev",
+          "rating": 2707
+        },
+        {
+          "symbol": "SO",
+          "name": "Wesley So",
+          "externalRef": "fide:wesley-so",
+          "rating": 2704
+        },
+        {
+          "symbol": "ABDUSATTOROV",
+          "name": "Nodirbek Abdusattorov",
+          "externalRef": "fide:nodirbek-abdusattorov",
+          "rating": 2704
+        },
+        {
+          "symbol": "WEI",
+          "name": "Yi Wei",
+          "externalRef": "fide:yi-wei",
+          "rating": 2704
+        },
+        {
+          "symbol": "FEDOSEEV",
+          "name": "Vladimir Fedoseev",
+          "externalRef": "fide:vladimir-fedoseev",
+          "rating": 2701
+        },
+        {
+          "symbol": "LEKO",
+          "name": "Peter Leko",
+          "externalRef": "fide:peter-leko",
+          "rating": 2700
+        },
+        {
+          "symbol": "ANAND",
+          "name": "Viswanathan Anand",
+          "externalRef": "fide:viswanathan-anand",
+          "rating": 2694
+        },
+        {
+          "symbol": "DING",
+          "name": "Liren Ding",
+          "externalRef": "fide:liren-ding",
+          "rating": 2689
+        },
+        {
+          "symbol": "MAGHSOODLOO",
+          "name": "Parham Maghsoodloo",
+          "externalRef": "fide:parham-maghsoodloo",
+          "rating": 2689
+        },
+        {
+          "symbol": "CARUANA",
+          "name": "Fabiano Caruana",
+          "externalRef": "fide:fabiano-caruana",
+          "rating": 2687
+        }
+      ]
+    },
+    {
+      "id": "fide:blitz",
+      "source": "fide",
+      "category": "blitz",
+      "title": "FIDE Blitz",
+      "ratingLabel": "FIDE Blitz rating",
+      "referenceKind": "snapshot",
+      "referenceSource": "EloTracker compilation of the November 2026 FIDE blitz list",
+      "asOf": "2026-11-01T00:00:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "CARLSEN",
+          "name": "Magnus Carlsen",
+          "externalRef": "fide:magnus-carlsen",
+          "rating": 2860
+        },
+        {
+          "symbol": "ABDUSATTOROV",
+          "name": "Nodirbek Abdusattorov",
+          "externalRef": "fide:nodirbek-abdusattorov",
+          "rating": 2819
+        },
+        {
+          "symbol": "NAKAMURA",
+          "name": "Hikaru Nakamura",
+          "externalRef": "fide:hikaru-nakamura",
+          "rating": 2800
+        },
+        {
+          "symbol": "FIROUZJA",
+          "name": "Alireza Firouzja",
+          "externalRef": "fide:alireza-firouzja",
+          "rating": 2797
+        },
+        {
+          "symbol": "DUBOV",
+          "name": "Daniil Dubov",
+          "externalRef": "fide:daniil-dubov",
+          "rating": 2779
+        },
+        {
+          "symbol": "ERIGAISI",
+          "name": "Arjun Erigaisi",
+          "externalRef": "fide:arjun-erigaisi",
+          "rating": 2766
+        },
+        {
+          "symbol": "NEPO",
+          "name": "Ian Nepomniachtchi",
+          "externalRef": "fide:ian-nepomniachtchi",
+          "rating": 2765
+        },
+        {
+          "symbol": "SO",
+          "name": "Wesley So",
+          "externalRef": "fide:wesley-so",
+          "rating": 2745
+        },
+        {
+          "symbol": "CARUANA",
+          "name": "Fabiano Caruana",
+          "externalRef": "fide:fabiano-caruana",
+          "rating": 2738
+        },
+        {
+          "symbol": "DING",
+          "name": "Liren Ding",
+          "externalRef": "fide:liren-ding",
+          "rating": 2736
+        },
+        {
+          "symbol": "MVL",
+          "name": "Maxime Vachier-Lagrave",
+          "externalRef": "fide:maxime-vachier-lagrave",
+          "rating": 2734
+        },
+        {
+          "symbol": "FEDOSEEV",
+          "name": "Vladimir Fedoseev",
+          "externalRef": "fide:vladimir-fedoseev",
+          "rating": 2726
+        },
+        {
+          "symbol": "SINDAROV",
+          "name": "Javokhir Sindarov",
+          "externalRef": "fide:javokhir-sindarov",
+          "rating": 2725
+        },
+        {
+          "symbol": "YU",
+          "name": "Yangyi Yu",
+          "externalRef": "fide:yangyi-yu",
+          "rating": 2722
+        },
+        {
+          "symbol": "NIHAL",
+          "name": "Nihal Sarin",
+          "externalRef": "fide:nihal-sarin",
+          "rating": 2721
+        },
+        {
+          "symbol": "BU",
+          "name": "Xiangzhi Bu",
+          "externalRef": "fide:xiangzhi-bu",
+          "rating": 2717
+        },
+        {
+          "symbol": "ARONIAN",
+          "name": "Levon Aronian",
+          "externalRef": "fide:levon-aronian",
+          "rating": 2714
+        },
+        {
+          "symbol": "ARTEMIEV",
+          "name": "Vladislav Artemiev",
+          "externalRef": "fide:vladislav-artemiev",
+          "rating": 2712
+        },
+        {
+          "symbol": "PRAGG",
+          "name": "Praggnanandhaa R",
+          "externalRef": "fide:praggnanandhaa-r",
+          "rating": 2712
+        },
+        {
+          "symbol": "NIEMANN",
+          "name": "Hans Moke Niemann",
+          "externalRef": "fide:hans-moke-niemann",
+          "rating": 2711
+        }
+      ]
+    },
+    {
+      "id": "chesscom:bullet",
+      "source": "chesscom",
+      "category": "bullet",
+      "title": "Chess.com Bullet",
+      "ratingLabel": "Chess.com bullet rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Chess.com public API /pub/leaderboards (live_bullet)",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "ARKADIIKHROM",
+          "name": "ArkadiiKhromaev",
+          "externalRef": "arkadiikhromaev",
+          "rating": 3602
+        },
+        {
+          "symbol": "GMBREWCHESS",
+          "name": "GMBrewChess",
+          "externalRef": "gmbrewchess",
+          "rating": 3500
+        },
+        {
+          "symbol": "PHILIPPIANS4",
+          "name": "Philippians46",
+          "externalRef": "philippians46",
+          "rating": 3454
+        },
+        {
+          "symbol": "HIKARU",
+          "name": "Hikaru",
+          "externalRef": "hikaru",
+          "rating": 3424
+        },
+        {
+          "symbol": "ZOLTANBOLT04",
+          "name": "zoltanbolt_04",
+          "externalRef": "zoltanbolt_04",
+          "rating": 3405
+        },
+        {
+          "symbol": "FIROUZJA2003",
+          "name": "Firouzja2003",
+          "externalRef": "firouzja2003",
+          "rating": 3386
+        },
+        {
+          "symbol": "GURELEDIZ",
+          "name": "gurelediz",
+          "externalRef": "gurelediz",
+          "rating": 3378
+        },
+        {
+          "symbol": "PARHAMOV",
+          "name": "Parhamov",
+          "externalRef": "parhamov",
+          "rating": 3352
+        },
+        {
+          "symbol": "ORANGEGHOST",
+          "name": "Orange_Ghost",
+          "externalRef": "orange_ghost",
+          "rating": 3333
+        },
+        {
+          "symbol": "MAGNUSCARLSE",
+          "name": "MagnusCarlsen",
+          "externalRef": "magnuscarlsen",
+          "rating": 3331
+        },
+        {
+          "symbol": "FAUSTINOORO",
+          "name": "FaustinoOro",
+          "externalRef": "faustinooro",
+          "rating": 3329
+        },
+        {
+          "symbol": "DOLPHIN2010",
+          "name": "Dolphin_2010",
+          "externalRef": "dolphin_2010",
+          "rating": 3325
+        },
+        {
+          "symbol": "ELFANGM2",
+          "name": "Elfangm2",
+          "externalRef": "elfangm2",
+          "rating": 3303
+        },
+        {
+          "symbol": "JINGTIANWU",
+          "name": "JingtianWu",
+          "externalRef": "jingtianwu",
+          "rating": 3295
+        },
+        {
+          "symbol": "WONDERFULTIM",
+          "name": "wonderfultime",
+          "externalRef": "wonderfultime",
+          "rating": 3287
+        },
+        {
+          "symbol": "NIHALSARIN",
+          "name": "nihalsarin",
+          "externalRef": "nihalsarin",
+          "rating": 3282
+        },
+        {
+          "symbol": "SPICYCATERPI",
+          "name": "spicycaterpillar",
+          "externalRef": "spicycaterpillar",
+          "rating": 3269
+        },
+        {
+          "symbol": "ARYSYA",
+          "name": "Arysya",
+          "externalRef": "arysya",
+          "rating": 3267
+        },
+        {
+          "symbol": "SINAMOVAHED",
+          "name": "Sina-Movahed",
+          "externalRef": "sina-movahed",
+          "rating": 3267
+        },
+        {
+          "symbol": "0GZPANDA",
+          "name": "0gZPanda",
+          "externalRef": "0gzpanda",
+          "rating": 3264
+        }
+      ]
+    },
+    {
+      "id": "chesscom:blitz",
+      "source": "chesscom",
+      "category": "blitz",
+      "title": "Chess.com Blitz",
+      "ratingLabel": "Chess.com blitz rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Chess.com public API /pub/leaderboards (live_blitz)",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "HIKARU",
+          "name": "Hikaru",
+          "externalRef": "hikaru",
+          "rating": 3455
+        },
+        {
+          "symbol": "FIROUZJA2003",
+          "name": "Firouzja2003",
+          "externalRef": "firouzja2003",
+          "rating": 3391
+        },
+        {
+          "symbol": "MAGNUSCARLSE",
+          "name": "MagnusCarlsen",
+          "externalRef": "magnuscarlsen",
+          "rating": 3375
+        },
+        {
+          "symbol": "NIHALSARIN",
+          "name": "nihalsarin",
+          "externalRef": "nihalsarin",
+          "rating": 3331
+        },
+        {
+          "symbol": "DENLAZ",
+          "name": "DenLaz",
+          "externalRef": "denlaz",
+          "rating": 3319
+        },
+        {
+          "symbol": "FAIRCHESSONY",
+          "name": "FairChess_on_YouTube",
+          "externalRef": "fairchess_on_youtube",
+          "rating": 3307
+        },
+        {
+          "symbol": "SINAMOVAHED",
+          "name": "Sina-Movahed",
+          "externalRef": "sina-movahed",
+          "rating": 3305
+        },
+        {
+          "symbol": "HANSONTWITCH",
+          "name": "HansOnTwitch",
+          "externalRef": "hansontwitch",
+          "rating": 3293
+        },
+        {
+          "symbol": "MICHAELROIZ",
+          "name": "MichaelRoiz",
+          "externalRef": "michaelroiz",
+          "rating": 3288
+        },
+        {
+          "symbol": "MICKITARYAN",
+          "name": "Micki-taryan",
+          "externalRef": "micki-taryan",
+          "rating": 3286
+        },
+        {
+          "symbol": "CHESSWARRIOR",
+          "name": "ChessWarrior7197",
+          "externalRef": "chesswarrior7197",
+          "rating": 3285
+        },
+        {
+          "symbol": "GURELEDIZ",
+          "name": "gurelediz",
+          "externalRef": "gurelediz",
+          "rating": 3281
+        },
+        {
+          "symbol": "GHANDEEVAM20",
+          "name": "GHANDEEVAM2003",
+          "externalRef": "ghandeevam2003",
+          "rating": 3279
+        },
+        {
+          "symbol": "POLISHFIGHTE",
+          "name": "Polish_fighter3000",
+          "externalRef": "polish_fighter3000",
+          "rating": 3277
+        },
+        {
+          "symbol": "RPRAGCHESS",
+          "name": "rpragchess",
+          "externalRef": "rpragchess",
+          "rating": 3275
+        },
+        {
+          "symbol": "FABIANOCARUA",
+          "name": "FabianoCaruana",
+          "externalRef": "fabianocaruana",
+          "rating": 3269
+        },
+        {
+          "symbol": "PARHAMOV",
+          "name": "Parhamov",
+          "externalRef": "parhamov",
+          "rating": 3267
+        },
+        {
+          "symbol": "GMWSO",
+          "name": "GMWSO",
+          "externalRef": "gmwso",
+          "rating": 3267
+        },
+        {
+          "symbol": "SIBELEPHANT",
+          "name": "Sibelephant",
+          "externalRef": "sibelephant",
+          "rating": 3264
+        },
+        {
+          "symbol": "LEGENDISBACK",
+          "name": "legendisback1",
+          "externalRef": "legendisback1",
+          "rating": 3256
+        }
+      ]
+    },
+    {
+      "id": "chesscom:rapid",
+      "source": "chesscom",
+      "category": "rapid",
+      "title": "Chess.com Rapid",
+      "ratingLabel": "Chess.com rapid rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Chess.com public API /pub/leaderboards (live_rapid)",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "MAGNUSCARLSE",
+          "name": "MagnusCarlsen",
+          "externalRef": "magnuscarlsen",
+          "rating": 2941
+        },
+        {
+          "symbol": "GUTOVANDREY",
+          "name": "GutovAndrey",
+          "externalRef": "gutovandrey",
+          "rating": 2938
+        },
+        {
+          "symbol": "SEANWINSHAND",
+          "name": "SeanWinshand",
+          "externalRef": "seanwinshand",
+          "rating": 2876
+        },
+        {
+          "symbol": "HIKARU",
+          "name": "Hikaru",
+          "externalRef": "hikaru",
+          "rating": 2838
+        },
+        {
+          "symbol": "LPSUPI",
+          "name": "LPSupi",
+          "externalRef": "lpsupi",
+          "rating": 2838
+        },
+        {
+          "symbol": "POLISHFIGHTE",
+          "name": "Polish_fighter3000",
+          "externalRef": "polish_fighter3000",
+          "rating": 2835
+        },
+        {
+          "symbol": "GIORGISIBASH",
+          "name": "Giorgi-Sibashvili",
+          "externalRef": "giorgi-sibashvili",
+          "rating": 2821
+        },
+        {
+          "symbol": "ILQAR74",
+          "name": "ilqar_74",
+          "externalRef": "ilqar_74",
+          "rating": 2815
+        },
+        {
+          "symbol": "CHESSWARRIOR",
+          "name": "ChessWarrior7197",
+          "externalRef": "chesswarrior7197",
+          "rating": 2807
+        },
+        {
+          "symbol": "FIROUZJA2003",
+          "name": "Firouzja2003",
+          "externalRef": "firouzja2003",
+          "rating": 2802
+        },
+        {
+          "symbol": "DENLAZ",
+          "name": "DenLaz",
+          "externalRef": "denlaz",
+          "rating": 2799
+        },
+        {
+          "symbol": "EVANDROBARBO",
+          "name": "Evandro_Barbosa",
+          "externalRef": "evandro_barbosa",
+          "rating": 2797
+        },
+        {
+          "symbol": "LACHESISQ",
+          "name": "lachesisQ",
+          "externalRef": "lachesisq",
+          "rating": 2793
+        },
+        {
+          "symbol": "KACPAROV",
+          "name": "Kacparov",
+          "externalRef": "kacparov",
+          "rating": 2793
+        },
+        {
+          "symbol": "GHANDEEVAM20",
+          "name": "GHANDEEVAM2003",
+          "externalRef": "ghandeevam2003",
+          "rating": 2791
+        },
+        {
+          "symbol": "GMKRIKOR",
+          "name": "GMKrikor",
+          "externalRef": "gmkrikor",
+          "rating": 2782
+        },
+        {
+          "symbol": "LOVEVAE",
+          "name": "LOVEVAE",
+          "externalRef": "lovevae",
+          "rating": 2778
+        },
+        {
+          "symbol": "CHRISTOPHERY",
+          "name": "ChristopherYoo",
+          "externalRef": "christopheryoo",
+          "rating": 2770
+        },
+        {
+          "symbol": "NIHALSARIN",
+          "name": "nihalsarin",
+          "externalRef": "nihalsarin",
+          "rating": 2767
+        },
+        {
+          "symbol": "GIGAQUPARADZ",
+          "name": "GigaQuparadze",
+          "externalRef": "gigaquparadze",
+          "rating": 2766
+        }
+      ]
+    },
+    {
+      "id": "lichess:bullet",
+      "source": "lichess",
+      "category": "bullet",
+      "title": "Lichess Bullet",
+      "ratingLabel": "Lichess bullet rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Lichess public API /api/player/top/20/bullet",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "ARKADIYKHROM",
+          "name": "Arkadiy_Khromaev",
+          "externalRef": "arkadiy_khromaev",
+          "rating": 3406
+        },
+        {
+          "symbol": "HACKERETTAN",
+          "name": "Hackerettan",
+          "externalRef": "hackerettan",
+          "rating": 3359
+        },
+        {
+          "symbol": "EDIZGUREL",
+          "name": "Ediz_Gurel",
+          "externalRef": "ediz_gurel",
+          "rating": 3339
+        },
+        {
+          "symbol": "DRTIGER",
+          "name": "Dr_Tiger",
+          "externalRef": "dr_tiger",
+          "rating": 3333
+        },
+        {
+          "symbol": "NIGHTKING96",
+          "name": "Night-King96",
+          "externalRef": "night-king96",
+          "rating": 3317
+        },
+        {
+          "symbol": "CHESSARTUS",
+          "name": "chess-art-us",
+          "externalRef": "chess-art-us",
+          "rating": 3279
+        },
+        {
+          "symbol": "IAMSTRAW",
+          "name": "iamstraw",
+          "externalRef": "iamstraw",
+          "rating": 3271
+        },
+        {
+          "symbol": "ANDRES4891",
+          "name": "Andres4891",
+          "externalRef": "andres4891",
+          "rating": 3264
+        },
+        {
+          "symbol": "TROJANHORSE2",
+          "name": "Trojanhorse2500",
+          "externalRef": "trojanhorse2500",
+          "rating": 3260
+        },
+        {
+          "symbol": "SERGIOOLIVA6",
+          "name": "SergioOliva64",
+          "externalRef": "sergiooliva64",
+          "rating": 3248
+        },
+        {
+          "symbol": "JOSHUAKIMMIC",
+          "name": "JoshuaKimmich22",
+          "externalRef": "joshuakimmich22",
+          "rating": 3245
+        },
+        {
+          "symbol": "FEEGLOOD",
+          "name": "FeegLood",
+          "externalRef": "feeglood",
+          "rating": 3244
+        },
+        {
+          "symbol": "BLAZINQ",
+          "name": "Blazinq",
+          "externalRef": "blazinq",
+          "rating": 3232
+        },
+        {
+          "symbol": "ROB188",
+          "name": "rob188",
+          "externalRef": "rob188",
+          "rating": 3225
+        },
+        {
+          "symbol": "MAHAMMADMURA",
+          "name": "MahammadMuradli2003",
+          "externalRef": "mahammadmuradli2003",
+          "rating": 3202
+        },
+        {
+          "symbol": "GLASNOSTPERE",
+          "name": "GlasnostPerestroika",
+          "externalRef": "glasnostperestroika",
+          "rating": 3201
+        },
+        {
+          "symbol": "WOSHIGESHAGU",
+          "name": "woshigeshagua",
+          "externalRef": "woshigeshagua",
+          "rating": 3200
+        },
+        {
+          "symbol": "VM",
+          "name": "V_M",
+          "externalRef": "v_m",
+          "rating": 3200
+        },
+        {
+          "symbol": "HEISENBERG01",
+          "name": "Heisenberg01",
+          "externalRef": "heisenberg01",
+          "rating": 3200
+        },
+        {
+          "symbol": "EXPERTISE64",
+          "name": "expertise64",
+          "externalRef": "expertise64",
+          "rating": 3200
+        }
+      ]
+    },
+    {
+      "id": "lichess:blitz",
+      "source": "lichess",
+      "category": "blitz",
+      "title": "Lichess Blitz",
+      "ratingLabel": "Lichess blitz rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Lichess public API /api/player/top/20/blitz",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "TARZANSMURF",
+          "name": "tarzansmurf",
+          "externalRef": "tarzansmurf",
+          "rating": 2981
+        },
+        {
+          "symbol": "ASDERT9",
+          "name": "asdert9",
+          "externalRef": "asdert9",
+          "rating": 2953
+        },
+        {
+          "symbol": "CUTEMOUSE83",
+          "name": "cutemouse83",
+          "externalRef": "cutemouse83",
+          "rating": 2937
+        },
+        {
+          "symbol": "KNIGHTCHECKS",
+          "name": "KnightCheckShadow",
+          "externalRef": "knightcheckshadow",
+          "rating": 2937
+        },
+        {
+          "symbol": "DRTIGER",
+          "name": "Dr_Tiger",
+          "externalRef": "dr_tiger",
+          "rating": 2934
+        },
+        {
+          "symbol": "AWORLDIDONTK",
+          "name": "AWorldIDontKnow",
+          "externalRef": "aworldidontknow",
+          "rating": 2929
+        },
+        {
+          "symbol": "REALDAVIDNAV",
+          "name": "RealDavidNavara",
+          "externalRef": "realdavidnavara",
+          "rating": 2926
+        },
+        {
+          "symbol": "VLADIMIROVIC",
+          "name": "Vladimirovich9000",
+          "externalRef": "vladimirovich9000",
+          "rating": 2917
+        },
+        {
+          "symbol": "HOWELLHUB",
+          "name": "HowellHub",
+          "externalRef": "howellhub",
+          "rating": 2914
+        },
+        {
+          "symbol": "ATHENAPALLAD",
+          "name": "athena-pallada",
+          "externalRef": "athena-pallada",
+          "rating": 2912
+        },
+        {
+          "symbol": "MLCHAEL",
+          "name": "Mlchael",
+          "externalRef": "mlchael",
+          "rating": 2910
+        },
+        {
+          "symbol": "ONEPOUNDROOK",
+          "name": "onepoundrook",
+          "externalRef": "onepoundrook",
+          "rating": 2910
+        },
+        {
+          "symbol": "DAFREX",
+          "name": "dafrex",
+          "externalRef": "dafrex",
+          "rating": 2906
+        },
+        {
+          "symbol": "SERGOY45",
+          "name": "Sergoy45",
+          "externalRef": "sergoy45",
+          "rating": 2903
+        },
+        {
+          "symbol": "HIGURUMAJ",
+          "name": "higuruma_j",
+          "externalRef": "higuruma_j",
+          "rating": 2900
+        },
+        {
+          "symbol": "FABSID",
+          "name": "Fabsid",
+          "externalRef": "fabsid",
+          "rating": 2900
+        },
+        {
+          "symbol": "ELCONCETO",
+          "name": "elconceto",
+          "externalRef": "elconceto",
+          "rating": 2897
+        },
+        {
+          "symbol": "TSOIDIMA",
+          "name": "Tsoi_Dima",
+          "externalRef": "tsoi_dima",
+          "rating": 2886
+        },
+        {
+          "symbol": "ABIK02",
+          "name": "Abik02",
+          "externalRef": "abik02",
+          "rating": 2882
+        },
+        {
+          "symbol": "JAKEBR8",
+          "name": "Jakebr8",
+          "externalRef": "jakebr8",
+          "rating": 2878
+        }
+      ]
+    },
+    {
+      "id": "lichess:rapid",
+      "source": "lichess",
+      "category": "rapid",
+      "title": "Lichess Rapid",
+      "ratingLabel": "Lichess rapid rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Lichess public API /api/player/top/20/rapid",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "KURALDGALAIN",
+          "name": "Kurald_Galain",
+          "externalRef": "kurald_galain",
+          "rating": 2799
+        },
+        {
+          "symbol": "CRAZYFASTGAM",
+          "name": "CRaZyFAstGamiNg1221",
+          "externalRef": "crazyfastgaming1221",
+          "rating": 2735
+        },
+        {
+          "symbol": "BAKINGINTHEO",
+          "name": "bakingintheoven",
+          "externalRef": "bakingintheoven",
+          "rating": 2724
+        },
+        {
+          "symbol": "SHADOWNINJA7",
+          "name": "ShadowNinja7i",
+          "externalRef": "shadowninja7i",
+          "rating": 2721
+        },
+        {
+          "symbol": "HAUNTINGGAME",
+          "name": "Haunting_Games",
+          "externalRef": "haunting_games",
+          "rating": 2718
+        },
+        {
+          "symbol": "VVERTI",
+          "name": "vverti",
+          "externalRef": "vverti",
+          "rating": 2703
+        },
+        {
+          "symbol": "ALEXSOELDEN",
+          "name": "Alex_Soelden",
+          "externalRef": "alex_soelden",
+          "rating": 2699
+        },
+        {
+          "symbol": "T34USSR",
+          "name": "T34USSR",
+          "externalRef": "t34ussr",
+          "rating": 2695
+        },
+        {
+          "symbol": "FASTBOOSTER",
+          "name": "FastBooster",
+          "externalRef": "fastbooster",
+          "rating": 2669
+        },
+        {
+          "symbol": "NEWCOMER68",
+          "name": "Newcomer68",
+          "externalRef": "newcomer68",
+          "rating": 2669
+        },
+        {
+          "symbol": "CHESSMEM",
+          "name": "chessmem",
+          "externalRef": "chessmem",
+          "rating": 2660
+        },
+        {
+          "symbol": "MARTINOEDENN",
+          "name": "Martino_Edenn",
+          "externalRef": "martino_edenn",
+          "rating": 2648
+        },
+        {
+          "symbol": "LARRYTHECABL",
+          "name": "Larrythecabledude",
+          "externalRef": "larrythecabledude",
+          "rating": 2646
+        },
+        {
+          "symbol": "CHESSMOUNT",
+          "name": "chessmount",
+          "externalRef": "chessmount",
+          "rating": 2646
+        },
+        {
+          "symbol": "KUTAHYAPORSE",
+          "name": "Kutahyaporselen",
+          "externalRef": "kutahyaporselen",
+          "rating": 2645
+        },
+        {
+          "symbol": "EVGENYSHARAP",
+          "name": "evgenysharapov",
+          "externalRef": "evgenysharapov",
+          "rating": 2641
+        },
+        {
+          "symbol": "METAN0IA",
+          "name": "metan0ia",
+          "externalRef": "metan0ia",
+          "rating": 2639
+        },
+        {
+          "symbol": "LIKEWATER",
+          "name": "likewater",
+          "externalRef": "likewater",
+          "rating": 2638
+        },
+        {
+          "symbol": "SPARSELY23",
+          "name": "sparsely23",
+          "externalRef": "sparsely23",
+          "rating": 2637
+        },
+        {
+          "symbol": "JURGENZWIEG1",
+          "name": "JurgenZwieg1900",
+          "externalRef": "jurgenzwieg1900",
+          "rating": 2636
+        }
+      ]
+    },
+    {
+      "id": "lichess:classical",
+      "source": "lichess",
+      "category": "classical",
+      "title": "Lichess Classical",
+      "ratingLabel": "Lichess classical rating",
+      "referenceKind": "cached_public_api",
+      "referenceSource": "Lichess public API /api/player/top/20/classical",
+      "asOf": "2026-11-10T05:04:00Z",
+      "live": false,
+      "players": [
+        {
+          "symbol": "GEK76",
+          "name": "gek76",
+          "externalRef": "gek76",
+          "rating": 2522
+        },
+        {
+          "symbol": "JOHNKRAMER19",
+          "name": "John_Kramer1953",
+          "externalRef": "john_kramer1953",
+          "rating": 2496
+        },
+        {
+          "symbol": "GGPLAYER",
+          "name": "GGplayer",
+          "externalRef": "ggplayer",
+          "rating": 2483
+        },
+        {
+          "symbol": "STERNSINGER1",
+          "name": "Sternsinger1",
+          "externalRef": "sternsinger1",
+          "rating": 2466
+        },
+        {
+          "symbol": "LANCE5500",
+          "name": "Lance5500",
+          "externalRef": "lance5500",
+          "rating": 2462
+        },
+        {
+          "symbol": "OJAIJOAO",
+          "name": "OjaiJoao",
+          "externalRef": "ojaijoao",
+          "rating": 2455
+        },
+        {
+          "symbol": "DRMULEKEVINF",
+          "name": "DrMuleKevinFan",
+          "externalRef": "drmulekevinfan",
+          "rating": 2437
+        },
+        {
+          "symbol": "KC6",
+          "name": "kc6",
+          "externalRef": "kc6",
+          "rating": 2430
+        },
+        {
+          "symbol": "KIRAOVO",
+          "name": "KiraOvO",
+          "externalRef": "kiraovo",
+          "rating": 2429
+        },
+        {
+          "symbol": "SYLVLONDON",
+          "name": "sylvlondon",
+          "externalRef": "sylvlondon",
+          "rating": 2426
+        },
+        {
+          "symbol": "EAGLEAN",
+          "name": "eaglean",
+          "externalRef": "eaglean",
+          "rating": 2425
+        },
+        {
+          "symbol": "SPEEDYSORCER",
+          "name": "SpeedySorcerer",
+          "externalRef": "speedysorcerer",
+          "rating": 2424
+        },
+        {
+          "symbol": "LUCASCROTTI",
+          "name": "lucascrotti",
+          "externalRef": "lucascrotti",
+          "rating": 2424
+        },
+        {
+          "symbol": "KCIOWA",
+          "name": "KCIOWA",
+          "externalRef": "kciowa",
+          "rating": 2423
+        },
+        {
+          "symbol": "GOALDENGOOKI",
+          "name": "Goalden_Gookie10",
+          "externalRef": "goalden_gookie10",
+          "rating": 2422
+        },
+        {
+          "symbol": "RTCM2200",
+          "name": "RTCM-2200",
+          "externalRef": "rtcm-2200",
+          "rating": 2422
+        },
+        {
+          "symbol": "ARTVEGA",
+          "name": "Art-Vega",
+          "externalRef": "art-vega",
+          "rating": 2421
+        },
+        {
+          "symbol": "KONNOVOLEG",
+          "name": "Konnov_Oleg",
+          "externalRef": "konnov_oleg",
+          "rating": 2411
+        },
+        {
+          "symbol": "TOMRATD",
+          "name": "TOMRATD",
+          "externalRef": "tomratd",
+          "rating": 2405
+        },
+        {
+          "symbol": "SCHACHSTRATE",
+          "name": "Schachstratege",
+          "externalRef": "schachstratege",
+          "rating": 2404
+        }
+      ]
+    },
+    {
+      "id": "site:bullet",
+      "source": "site",
+      "category": "bullet",
+      "title": "Chess Bullet",
+      "ratingLabel": "On-site bullet rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    },
+    {
+      "id": "site:blitz",
+      "source": "site",
+      "category": "blitz",
+      "title": "Chess Blitz",
+      "ratingLabel": "On-site blitz rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    },
+    {
+      "id": "site:rapid",
+      "source": "site",
+      "category": "rapid",
+      "title": "Chess Rapid",
+      "ratingLabel": "On-site rapid rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    },
+    {
+      "id": "site:daily",
+      "source": "site",
+      "category": "daily",
+      "title": "Chess Daily",
+      "ratingLabel": "On-site daily rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    },
+    {
+      "id": "site:untimed",
+      "source": "site",
+      "category": "untimed",
+      "title": "Chess Untimed",
+      "ratingLabel": "On-site untimed rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    },
+    {
+      "id": "site:puzzles",
+      "source": "site",
+      "category": "puzzles",
+      "title": "Chess Puzzles",
+      "ratingLabel": "On-site puzzles rating",
+      "referenceKind": "site_rating",
+      "referenceSource": "Chess profile ratings on this site",
+      "asOf": null,
+      "live": false,
+      "players": []
+    }
+  ]
+}

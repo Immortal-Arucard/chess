@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { createChessApp } from './chess-api.mjs';
+import { refreshExternalQuotes } from './exchange-ratings.mjs';
 import { deliverDue } from './push-send.mjs';
 
 // Production Worker entry. Each request and each scheduled run opens its own
@@ -133,6 +134,16 @@ const worker = {
       } catch (err) {
         try { await client.query('rollback'); } catch (ignore) { /* rollback failed */ }
         throw err;
+      }
+      if (env && env.EXCHANGE_REFRESH === '1') {
+        try {
+          const quotes = await refreshExternalQuotes(fetch);
+          await client.query('begin');
+          await client.query('select chess_service.exchange_cache_references($1::jsonb)', [JSON.stringify({ quotes })]);
+          await client.query('commit');
+        } catch (err) {
+          try { await client.query('rollback'); } catch (ignore) { /* keep the stored snapshot */ }
+        }
       }
     });
   }

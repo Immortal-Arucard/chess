@@ -60,7 +60,7 @@ const origin = 'http://127.0.0.1:' + server.address().port;
 const browser = await puppeteer.launch({ executablePath: chromePath, headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 try {
   const page = await browser.newPage();
-  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v26'));
+  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v27'));
   await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
   const deadline = Date.now() + 15000;
   let active = false;

@@ -16,9 +16,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css?v=26">
+<link rel="stylesheet" href="/assets/chess/exchange.css?v=27">
 
 </head>
-<body class="sheet">
+<body class="sheet exchange">
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="site-bar">
@@ -36,15 +37,15 @@
   </div>
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Exchange</span></li></ol></nav>
-<main class="page" id="main">
-  <p class="eyebrow">Planned. Not operational.</p>
+<main class="page exchange-page" id="main">
+  <p class="ex-banner" role="status">Simulated, not real money. Balances are AMU and cannot be cashed out.</p>
+  <p class="eyebrow">Simulated market</p>
   <h1>Exchange</h1>
   <div class="prose">
-    <p>This page is reserved for a simulated ratings trading exchange connected to the marketplace and the community.</p>
-    <p>It is planned and is not operational. There is no market engine. This page shows no orders, prices, volume, accounts, or balances, and it has not issued a balance.</p>
-    <p>The intended simulated currency is AMU. The intended allotment is one trillion (1,000,000,000,000) AMU per account. Accounts are not meant to issue themselves an unlimited amount. AMU has no real-money value. The exchange is not for deposits, cashouts, or real trading.</p>
-    <p>Separate markets are intended for official rating formats, Chess.com ratings, Lichess ratings, and future ratings from this site. An actual rating is distinct from a simulated price. This site does not claim ownership of any player and does not claim an endorsement from any player, Chess.com, or Lichess.</p>
+    <p>Buy and sell simulated claims on top-player ratings. Every Chess account is granted 1,000,000,000,000 AMU once. There is no other way for an account to issue itself AMU. AMU has no real-money value.</p>
+    <p>A reference rating keeps its source and as-of date. A simulated price, bid, and ask are separate. This site does not claim ownership of any player and does not claim an endorsement from any player, FIDE, Chess.com, or Lichess.</p>
   </div>
+  <div id="exchange-app" aria-live="polite"></div>
   <nav class="page-nav" aria-label="Related">
   <h2>Related</h2>
   <ul class="children">
@@ -77,5 +78,6 @@
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'});</script>
 <script src="/assets/site.js?v=26"></script>
+<script type="module" src="/exchange/exchange.js?v=27"></script>
 </body>
 </html>

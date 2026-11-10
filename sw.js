@@ -1,4 +1,4 @@
-const CACHE = 'chess-v26';
+const CACHE = 'chess-v27';
 const ROUTES = [
   '/',
   '/theory/',
@@ -42,6 +42,9 @@ const ASSETS = [
   '/marketplace/index.html',
   '/exchange/',
   '/exchange/index.html',
+  '/exchange/exchange.js',
+  '/exchange/instruments.json',
+  '/assets/chess/exchange.css',
   '/manifest.webmanifest',
   '/assets/site.css',
   '/assets/site.js',
