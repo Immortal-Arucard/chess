@@ -17,7 +17,9 @@ Test in Stripe sandbox (test mode) before using live keys.
      - `checkout.session.async_payment_failed`
      - `checkout.session.expired`
      - `payment_intent.payment_failed`
+     - `charge.succeeded`
      - `charge.refunded`
+     - `transfer.created`
      - `charge.dispute.created`
      - `charge.dispute.updated`
      - `charge.dispute.closed`
