@@ -1,4 +1,4 @@
-const CACHE = 'chess-v24';
+const CACHE = 'chess-v25';
 const ROUTES = [
   '/',
   '/theory/',
@@ -27,6 +27,7 @@ const ASSETS = [
   '/puzzles/index.html',
   '/analysis/',
   '/analysis/index.html',
+  '/analysis/analysis.js',
   '/community/',
   '/community/index.html',
   '/community/profile/',
@@ -44,6 +45,9 @@ const ASSETS = [
   '/manifest.webmanifest',
   '/assets/site.css',
   '/assets/site.js',
+  '/assets/chess/analysis-model.js',
+  '/assets/chess/analysis-engine.js',
+  '/assets/chess/analysis.css',
   '/assets/chess/account-menu.js',
   '/assets/chess/chess-section.js',
   '/assets/account-sections.js',

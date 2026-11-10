@@ -42,6 +42,7 @@ jobs:
       - run: node assets/chess/author-avatar.test.mjs
       - run: node assets/chess/human-rules.test.mjs
       - run: node assets/chess/rating.test.mjs
+      - run: node assets/chess/analysis-model.test.mjs
       - run: node assets/chess/account-menu.test.mjs
       - run: node server/master-header.test.mjs
       - run: node server/messages.test.mjs
@@ -50,6 +51,9 @@ jobs:
       - run: node server/push.test.mjs
       - run: node server/private-execute.test.mjs
       - run: node server/dm-avatars.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: node server/analysis.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: node server/puzzle-seed.test.mjs

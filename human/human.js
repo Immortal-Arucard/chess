@@ -5,6 +5,7 @@ import { authorChip } from '../assets/chess/author-avatar.js';
 import { formatDelta, winGain } from '../assets/chess/rating.js';
 import { createChessGateway } from '../assets/chess/community-gateway.js';
 import { closeGameStage, requestGameFullscreen, syncGameStage } from '../assets/chess/game-stage.js';
+import { rememberAnalysis } from '../assets/chess/analysis-model.js';
 import {
   CATEGORIES, STANDARD_FEN, chatControls, cleanChatBody, clockView, formatClock, formatSpan, loadChatSize, outcome,
   piecesOf, playSan, replaySans, kingSquare, resolveTimeControl, saveChatSize, timeSummary, unreadCount
@@ -484,7 +485,15 @@ function endPanel() {
   discard.type = 'button';
   discard.id = 'discard-result';
   discard.addEventListener('click', () => { pass.saved = true; pass = null; mode = 'home'; notice = 'The game was discarded.'; paint(); });
-  panel.append(save, discard);
+  const analyze = document.createElement('a');
+  analyze.className = 'tool';
+  analyze.href = '/analysis/';
+  analyze.textContent = 'Analyze';
+  analyze.addEventListener('click', () => {
+    pass.game.header('White', 'White', 'Black', 'Black', 'Result', pass.result || '*');
+    rememberAnalysis({ pgn: pass.game.pgn(), result: pass.result });
+  });
+  panel.append(save, discard, analyze);
   root.append(panel);
 }
 async function savePass() {
@@ -723,6 +732,19 @@ function onlineGame() {
   }
   boardColumn.append(players);
   boardColumn.append(el('p', null, game.status === 'active' ? turnName + ' to move' + (game.dailyDays ? ' · ' + formatSpan(view.dailyLeftMs) : '') : (game.result || game.status) + ' ' + (game.termination || '')));
+  if (game.status === 'finished') {
+    const analyze = document.createElement('a');
+    analyze.className = 'tool';
+    analyze.href = '/analysis/';
+    analyze.textContent = 'Analyze';
+    analyze.addEventListener('click', () => {
+      const replayGame = new Chess(game.startFen || undefined);
+      (game.sans || []).forEach((san) => { try { replayGame.move(san); } catch (err) { /* skip a move the record cannot replay */ } });
+      replayGame.header('White', game.whiteName || 'White', 'Black', game.blackName || 'Black', 'Result', game.result || '*');
+      rememberAnalysis({ pgn: replayGame.pgn(), result: game.result });
+    });
+    boardColumn.append(analyze);
+  }
   if (game.rated && game.status === 'active' && game.whiteRatingBefore != null && game.blackRatingBefore != null && game.myColor) {
     const mine = game.myColor === 'white' ? game.whiteRatingBefore : game.blackRatingBefore;
     const theirs = game.myColor === 'white' ? game.blackRatingBefore : game.whiteRatingBefore;
@@ -898,7 +920,12 @@ function historyList() {
     const open = el('button', 'tool', 'Replay');
     open.type = 'button';
     open.addEventListener('click', () => { replay = { game, ply: 0 }; paint(); });
-    card.append(open);
+    const analyze = document.createElement('a');
+    analyze.className = 'tool';
+    analyze.href = '/analysis/';
+    analyze.textContent = 'Analyze';
+    analyze.addEventListener('click', () => rememberAnalysis({ pgn: game.pgn, result: game.result }));
+    card.append(open, analyze);
     if (replay && replay.game.id === game.id) card.append(replayBox());
     root.append(card);
   });
