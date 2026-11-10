@@ -186,7 +186,7 @@ const AUTH_HEADERS = {
   'x-content-type-options': 'nosniff'
 };
 
-export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchImpl }) {
+export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchImpl, deliver, vapidPublicKey }) {
   const master = createSupabaseAuth({ url: supabaseUrl, apiKey: supabaseKey, fetchImpl: fetchImpl || fetch });
   async function query(text, params) {
     const client = await pool.connect();
@@ -261,6 +261,15 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
           ]
         );
         return send(200, result.rows[0].roster);
+      }
+      if (req.method === 'GET' && url.pathname === '/api/push/config') {
+        const key = String(vapidPublicKey || '');
+        return send(200, { publicKey: key, configured: key.length > 20 });
+      }
+      if (req.method === 'GET' && url.pathname === '/api/push/settings') {
+        if (!token) return send(401, { error: 'Sign in before doing that.' });
+        const result = await query('select chess_service.push_settings($1) as settings', [token]);
+        return send(200, { settings: result.rows[0].settings });
       }
       if (req.method === 'GET' && url.pathname === '/api/discussion') {
         const result = await query('select chess_service.discussion_page($1, $2, $3, $4, $5) as messages', [
@@ -449,12 +458,37 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (url.pathname === '/api/discussion') {
         const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
         const result = await query('select chess_service.discussion_send($1, $2, $3) as message', [token, body.body, authorId]);
+        if (deliver) { try { await deliver(query); } catch (err) { /* the message is already stored */ } }
         return send(200, result.rows[0].message);
+      }
+      if (url.pathname === '/api/push/subscribe') {
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const subscription = body.subscription || {};
+        const keys = subscription.keys || {};
+        await query('select chess_service.push_save($1, $2, $3, $4, $5)', [token, authorId, subscription.endpoint, keys.p256dh, keys.auth]);
+        if (deliver) { try { await deliver(query); } catch (err) { /* the subscription is already stored */ } }
+        return send(200, { saved: true });
+      }
+      if (url.pathname === '/api/push/unsubscribe') {
+        await query('select chess_service.push_drop($1, $2)', [token, String(body.endpoint || '')]);
+        return send(200, { removed: true });
+      }
+      if (url.pathname === '/api/push/settings') {
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const result = await query('select chess_service.push_preference($1, $2, $3, $4) as settings', [token, authorId, body.kind, body.enabled === true]);
+        return send(200, { settings: result.rows[0].settings });
+      }
+      if (url.pathname === '/api/push/test') {
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        await query('select chess_service.push_test($1, $2)', [token, authorId]);
+        if (deliver) { try { await deliver(query); } catch (err) { /* the test event remains until a later send */ } }
+        return send(200, { sent: true });
       }
       if (url.pathname === '/api/messages') {
         const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
         const withId = typeof body.with === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.with) ? body.with : null;
         const result = await query('select chess_service.direct_send($1, $2, $3, $4) as message', [token, authorId, withId, body.body]);
+        if (deliver) { try { await deliver(query); } catch (err) { /* the message is already stored */ } }
         return send(200, result.rows[0].message);
       }
       if (url.pathname === '/api/posts') {
@@ -516,7 +550,7 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         return send(200, result.rows[0].saved);
       }
       if (url.pathname.startsWith('/api/human')) {
-        const human = await handleHumanPost({ url, token, body, query, send });
+        const human = await handleHumanPost({ url, token, body, query, send, deliver });
         if (human !== false) return;
       }
       if (url.pathname.startsWith('/api/puzzles')) {

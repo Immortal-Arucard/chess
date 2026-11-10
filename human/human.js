@@ -1020,6 +1020,9 @@ async function boot() {
       if (profile) chosen = { id: profile.id, displayName: profile.displayName };
     } catch (err) { notice = err.message; }
   }
+  if (params.get('match') && account && account.profile) {
+    try { openGame(await get('/api/human/games/' + params.get('match'))); } catch (err) { notice = err.message; mode = 'online'; }
+  }
   if (params.get('invite') && account && account.profile) {
     try { openGame(await get('/api/human/invite/' + params.get('invite'))); } catch (err) { notice = err.message; mode = 'online'; }
   }

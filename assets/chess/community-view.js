@@ -1,5 +1,6 @@
 import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
 import { mentionParts } from './mentions.js';
+import { mountPushPrompt, mountPushSettings } from './push-client.js';
 import { prepareProfileImage } from './profile-picture.js';
 import { authorChip, elementShown, forgetAuthorPortrait, markPortraitUnavailable, portraitFor } from './author-avatar.js';
 
@@ -131,6 +132,7 @@ export function mountCommunity(root, options) {
     span.textContent = 'Opens your Chess profile as its own page. Exit profile to return to the rest of the site.';
     link.append(strong, span);
     own.append(link);
+    if (gateway) mountPushPrompt(own, gateway);
   }
 
   function signedOut() {
@@ -902,6 +904,7 @@ export function mountProfile(root, options) {
       const tools = el('div', 'community-tools');
       tools.append(name, button, field('Bio', bioInput), saveBio, field('Profile picture', portraitInput), savePortrait, field('Background image', backgroundInput), saveBackground);
       root.append(tools);
+      if (gateway) mountPushSettings(root, gateway);
     }
     const list = el('div', 'community-list');
     list.append(el('h3', null, 'Posts'));

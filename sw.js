@@ -1,4 +1,4 @@
-const CACHE = 'chess-v21';
+const CACHE = 'chess-v22';
 const ROUTES = [
   '/',
   '/theory/',
@@ -66,6 +66,8 @@ const ASSETS = [
   '/assets/chess/community-gateway.js',
   '/assets/chess/community-app.js',
   '/assets/chess/mentions.js',
+  '/assets/chess/push-config.js',
+  '/assets/chess/push-client.js',
   '/assets/chess/roster.js',
   '/assets/chess/roster.css',
   '/human/human.js',
@@ -132,6 +134,28 @@ const REDIRECTS = {
   '/roster': '/community/roster/',
   '/roster/': '/community/roster/'
 };
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; }
+  catch (err) { payload = { title: 'Chess', body: event.data ? event.data.text() : '' }; }
+  const title = String(payload.title || 'Chess').slice(0, 120);
+  const body = String(payload.body || '').slice(0, 180);
+  const url = typeof payload.url === 'string' && payload.url.charAt(0) === '/' && payload.url.charAt(1) !== '/' ? payload.url : '/';
+  event.waitUntil(self.registration.showNotification(title, { body, data: { url } }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path = event.notification.data && event.notification.data.url;
+  const target = new URL(typeof path === 'string' && path.charAt(0) === '/' ? path : '/', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    const open = windows.find((client) => client.url === target);
+    if (open && open.focus) return open.focus();
+    if (self.clients.openWindow) return self.clients.openWindow(target);
+    return null;
+  }));
+});
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;

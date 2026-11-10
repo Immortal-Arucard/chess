@@ -87,7 +87,19 @@ export async function handleHumanGet({ url, token, query, send }) {
   return false;
 }
 
-export async function handleHumanPost({ url, token, body, query, send }) {
+async function finishGame(query, token, deliver, game) {
+  if (game && game.id) {
+    try { await query('select chess_service.notification_from_game($1, $2)', [token, game.id]); }
+    catch (err) { /* the move stands even if the notice does not */ }
+  }
+  if (deliver) {
+    try { await deliver(query); }
+    catch (err) { /* a failed push does not undo the move */ }
+  }
+  return game;
+}
+
+export async function handleHumanPost({ url, token, body, query, send, deliver }) {
   if (!url.pathname.startsWith('/api/human')) return false;
   const authorId = uuid(body.authorId);
   if (url.pathname === '/api/human/challenges') {
@@ -101,20 +113,20 @@ export async function handleHumanPost({ url, token, body, query, send }) {
       'select chess_service.human_create($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) as game',
       [token, authorId, kind, color, time.category, time.label, time.baseMs, time.incrementMs, time.dailyDays, opponent, body.rated === true]
     );
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   const id = uuid(body.id);
   if (url.pathname === '/api/human/cancel') {
     const result = await query('select chess_service.human_cancel($1, $2, $3) as game', [token, authorId, id]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/decline') {
     const result = await query('select chess_service.human_decline($1, $2, $3) as game', [token, authorId, id]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/accept') {
     const result = await query('select chess_service.human_accept($1, $2, $3, $4) as game', [token, authorId, id, body.invite || null]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/move') {
     const current = await query('select chess_service.human_get($1, $2, $3) as game', [token, id, null]);
@@ -128,19 +140,19 @@ export async function handleHumanPost({ url, token, body, query, send }) {
     const result = await query('select chess_service.human_move($1, $2, $3, $4, $5, $6, $7) as game', [
       token, authorId, id, Number(body.version), played.san, end.result, end.termination || null
     ]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/resign') {
     const result = await query('select chess_service.human_resign($1, $2, $3, $4) as game', [token, authorId, id, Number(body.version)]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/draw') {
     const result = await query('select chess_service.human_draw($1, $2, $3, $4, $5) as game', [token, authorId, id, Number(body.version), String(body.action || '')]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/abort') {
     const result = await query('select chess_service.human_abort($1, $2, $3) as game', [token, authorId, id]);
-    return send(200, result.rows[0].game);
+    return send(200, await finishGame(query, token, deliver, result.rows[0].game));
   }
   if (url.pathname === '/api/human/chat') {
     const result = await query('select chess_service.human_chat($1, $2, $3, $4) as game', [token, authorId, id, body.body]);
