@@ -43,7 +43,7 @@ const screens = [
   '/community/roster/'
 ];
 try {
-  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v25'));
+  await page.evaluateOnNewDocument(() => sessionStorage.setItem('chess-sw-reload', 'chess-v26'));
 await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
   const deadline = Date.now() + 15000;
   let cached = false;
@@ -51,7 +51,7 @@ await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
     cached = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration || !registration.active) return false;
-      const cache = await caches.open('chess-v25');
+      const cache = await caches.open('chess-v26');
       const keys = await cache.keys();
       return keys.some((key) => key.url.endsWith('/assets/chess/profile-picture.js'))
         && keys.some((key) => key.url.endsWith('/assets/chess/author-avatar.js'))
@@ -69,7 +69,7 @@ await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
     if (cached) break;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  assert.equal(cached, true, 'chess-v25 did not precache the roster');
+  assert.equal(cached, true, 'chess-v26 did not precache the roster');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.setOfflineMode(true);
   for (const path of screens) {
