@@ -45,6 +45,13 @@ export function createChessGateway() {
       const body = await response.json();
       return body.profile || null;
     },
+    async masterAvatar() {
+      const response = await fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) return '';
+      const body = await response.json().catch(() => ({}));
+      const url = body && body.master && typeof body.master.avatarUrl === 'string' ? body.master.avatarUrl : '';
+      return url.startsWith('https://') ? url : '';
+    },
     async signIn(email, displayName) {
       try { sessionStorage.setItem(PENDING_NAME, displayName); } catch (err) { /* the name form asks again */ }
       const response = await fetch('/api/auth/start', {

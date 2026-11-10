@@ -2,7 +2,7 @@ import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason,
 import { mentionParts } from './mentions.js';
 import { mountPushPrompt, mountPushSettings } from './push-client.js';
 import { prepareProfileImage } from './profile-picture.js';
-import { authorChip, elementShown, forgetAuthorPortrait, markPortraitUnavailable, portraitFor } from './author-avatar.js';
+import { authorChip, authorMini, elementShown, forgetAuthorPortrait, markPortraitUnavailable, portraitFor } from './author-avatar.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -972,13 +972,32 @@ export function mountProfile(root, options) {
   });
 }
 
+export function directMessageLine(item, sender) {
+  const line = el('div', 'message-line');
+  const name = sender && sender.name ? sender.name : 'Member';
+  line.append(authorMini(name, sender && sender.id, { avatarUrl: sender && sender.avatarUrl }));
+  line.append(el('div', 'message-bubble', item && item.body ? item.body : ''));
+  return line;
+}
+
 export function mountMessages(root, options) {
   const gateway = options.gateway || null;
   let profile = null;
+  let selfAvatar = '';
   let threads = [];
   let open = null;
   let error = '';
   let draft = '';
+
+  function senderFor(item) {
+    const mine = !!(profile && item && item.authorId === profile.id);
+    const other = open && open.with;
+    return {
+      id: item && item.authorId,
+      name: mine ? (profile.displayName || 'Member') : (other && other.displayName) || 'Member',
+      avatarUrl: mine ? selfAvatar : (item && item.avatarUrl) || ''
+    };
+  }
 
   function paintThread(parent) {
     if (!open) return;
@@ -986,9 +1005,7 @@ export function mountMessages(root, options) {
     const log = el('div', 'discussion-log');
     log.id = 'message-log';
     (open.messages || []).forEach((item) => {
-      const line = el('p', 'discussion-line');
-      line.append(el('span', 'discussion-body', item.body));
-      log.append(line);
+      log.append(directMessageLine(item, senderFor(item)));
     });
     const input = document.createElement('textarea');
     input.id = 'message-body';
@@ -1051,6 +1068,7 @@ export function mountMessages(root, options) {
   if (!options.configured || !gateway) return;
   gateway.profile().then(async (session) => {
     profile = session;
+    if (gateway.masterAvatar) selfAvatar = await gateway.masterAvatar();
     if (!profile) { render(); return; }
     if (options.withId) open = await gateway.openMessages(options.withId);
     else {

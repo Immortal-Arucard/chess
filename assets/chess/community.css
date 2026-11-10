@@ -31,6 +31,7 @@
     radial-gradient(circle at 50% 74%, #d0d0d0 0 7px, transparent 8px),
     #1a1a1a;
 }
+.author-avatar.is-initials{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
 .author-avatar.is-unavailable{
   border-style:dashed;
   background:
@@ -40,6 +41,12 @@
 .author-chip:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
 .community-time{margin:4px 0 0;color:var(--mute);font-size:12px}
 .community-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55}
+.message-line{display:flex;flex-direction:row;align-items:flex-start;gap:8px;margin-top:10px;max-width:100%}
+.message-line .author-mini{flex:0 0 32px}
+.message-bubble{
+  flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid var(--line);border-radius:16px;
+  background:#000;color:#e8e8e8;white-space:pre-wrap;overflow-wrap:anywhere;
+}
 .discussion-line{
   display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
   white-space:pre-wrap;overflow-wrap:anywhere;color:#e8e8e8;line-height:1.55;
