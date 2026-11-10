@@ -111,7 +111,13 @@ const worker = {
           supabaseUrl: env.SUPABASE_URL,
           supabaseKey: env.SUPABASE_ANON_KEY,
           vapidPublicKey: env && env.VAPID_PUBLIC_KEY,
-          deliver: vapid ? (query) => deliverDue(query, vapid) : null
+          deliver: vapid ? (query) => deliverDue(query, vapid) : null,
+          stripe: {
+            secretKey: env && env.STRIPE_SECRET_KEY,
+            webhookSecret: env && env.STRIPE_WEBHOOK_SECRET,
+            publishableKey: env && env.STRIPE_PUBLISHABLE_KEY,
+            feeBps: env && env.MARKET_FEE_BPS
+          }
         });
         return bridge(app, request);
       });

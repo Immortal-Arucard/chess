@@ -14,5 +14,10 @@ export const PUSH_KINDS = [
   ['challenged', 'Challenge'],
   ['game_result', 'Game result'],
   ['challenge_accepted', 'Challenge accepted'],
-  ['challenge_declined', 'Challenge declined']
+  ['challenge_declined', 'Challenge declined'],
+  ['market_offer', 'Listing trade offer'],
+  ['market_accepted', 'Listing trade accepted'],
+  ['market_declined', 'Listing trade declined'],
+  ['market_order', 'Listing order'],
+  ['market_shipped', 'Listing shipped']
 ];

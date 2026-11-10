@@ -1,0 +1,14 @@
+.market-banner{margin:12px 0;padding:12px;border:1px solid #ffd0a8;border-radius:12px;color:#ffd0a8}
+.market-tools,.market-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.market-grid{display:grid;gap:12px;margin-top:12px}
+.market-card,.market-detail,.market-form{border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.market-form label,.market-detail label{display:grid;gap:4px;margin:8px 0}
+.market-form input,.market-form textarea,.market-form select,.market-tools input,.market-tools select{
+  width:100%;max-width:100%;min-height:44px;box-sizing:border-box;background:#000;color:#fff;border:1px solid var(--line);border-radius:12px;font:inherit
+}
+.market-form textarea{min-height:8rem}
+.market-rule{color:var(--mute)}
+.market-photo{width:100%;max-width:16rem;border-radius:8px}
+@media (min-width:900px){
+  .market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
