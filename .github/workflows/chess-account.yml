@@ -44,6 +44,8 @@ jobs:
       - run: node assets/chess/rating.test.mjs
       - run: node assets/chess/account-menu.test.mjs
       - run: node server/master-header.test.mjs
+      - run: node server/messages.test.mjs
+      - run: node assets/chess/mentions.test.mjs
       - run: node server/puzzle-seed.test.mjs
       - run: node server/game-record.test.mjs
       - run: node server/supabase-auth.test.mjs

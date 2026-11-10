@@ -72,6 +72,10 @@ export function communityRoute(location) {
   const path = String(location.pathname || '').replace(/\/index\.html$/, '');
   const normalized = path.endsWith('/') ? path : path + '/';
   if (normalized === '/community/discussion/') return { page: 'discussion' };
+  if (normalized === '/community/messages/') {
+    const withId = new URLSearchParams(location.search || '').get('with') || '';
+    return { page: 'messages', withId: UUID.test(withId) ? withId : '' };
+  }
   return profileRoute(location);
 }
 

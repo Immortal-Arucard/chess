@@ -163,6 +163,21 @@ export function createChessGateway() {
     async sendDiscussion(body, authorId) {
       return send('/api/discussion', { body, authorId });
     },
+    async listMessages() {
+      const response = await fetch('/api/messages', { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Messages could not be loaded.');
+      return { threads: body.threads || [] };
+    },
+    async openMessages(withId) {
+      const response = await fetch('/api/messages?with=' + encodeURIComponent(withId), { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'That conversation could not be loaded.');
+      return body;
+    },
+    async sendMessage(withId, body, authorId) {
+      return send('/api/messages', { with: withId, body, authorId });
+    },
     async listReplies(postId, options) {
       const cursor = options && options.cursor;
       const limit = options && options.limit ? options.limit : 20;
