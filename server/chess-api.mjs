@@ -137,7 +137,11 @@ function publicError(error) {
     'That puzzle order is not available.',
     'That puzzle range is not available.',
     'That puzzle attempt was not found.',
-    'That puzzle was not found.'
+    'That puzzle was not found.',
+    'Choose another Chess member.',
+    'That conversation was not found.',
+    'A direct message must be 1 to 1000 characters.',
+    'You can message only as your own Chess profile.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
@@ -267,6 +271,23 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
           boundedLimit(url.searchParams.get('limit'))
         ]);
         return send(200, { messages: result.rows[0].messages, limit: boundedLimit(url.searchParams.get('limit')) });
+      }
+      if (req.method === 'GET' && url.pathname === '/api/messages') {
+        if (!token) return send(401, { error: 'Sign in before doing that.' });
+        const withId = url.searchParams.get('with');
+        if (withId) {
+          const result = await query('select chess_service.direct_open($1, $2) as thread', [token, withId]);
+          return send(200, result.rows[0].thread);
+        }
+        const threadId = url.searchParams.get('thread');
+        if (threadId) {
+          const result = await query('select chess_service.direct_page($1, $2, $3, $4, $5) as thread', [
+            token, threadId, url.searchParams.get('before') || null, url.searchParams.get('beforeId') || null, boundedLimit(url.searchParams.get('limit'))
+          ]);
+          return send(200, result.rows[0].thread);
+        }
+        const result = await query('select chess_service.direct_inbox($1) as threads', [token]);
+        return send(200, { threads: result.rows[0].threads });
       }
       if (req.method === 'GET' && url.pathname === '/api/posts') {
         const limit = boundedLimit(url.searchParams.get('limit'));
@@ -428,6 +449,12 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (url.pathname === '/api/discussion') {
         const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
         const result = await query('select chess_service.discussion_send($1, $2, $3) as message', [token, body.body, authorId]);
+        return send(200, result.rows[0].message);
+      }
+      if (url.pathname === '/api/messages') {
+        const authorId = typeof body.authorId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.authorId) ? body.authorId : null;
+        const withId = typeof body.with === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.with) ? body.with : null;
+        const result = await query('select chess_service.direct_send($1, $2, $3, $4) as message', [token, authorId, withId, body.body]);
         return send(200, result.rows[0].message);
       }
       if (url.pathname === '/api/posts') {

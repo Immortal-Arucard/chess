@@ -84,7 +84,7 @@ try {
     const branch = link && link.parentElement.nextElementSibling;
     return branch ? [...branch.querySelectorAll(':scope > .nav-item > a')].map((anchor) => anchor.textContent) : [];
   });
-  assert.deepEqual(nested, ['Discussion', 'Roster']);
+  assert.deepEqual(nested, ['Discussion', 'Messages', 'Roster']);
   let box = await page.evaluate(() => {
     const slot = document.getElementById('account-slot').getBoundingClientRect();
     const title = document.querySelector('.site-name').getBoundingClientRect();

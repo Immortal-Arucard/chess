@@ -1,4 +1,5 @@
 import { LIMITS, cleanBody, cleanDiscussion, cleanEmail, cleanName, cleanReason, profilePath } from './community-model.js';
+import { mentionParts } from './mentions.js';
 import { prepareProfileImage } from './profile-picture.js';
 import { authorChip, elementShown, forgetAuthorPortrait, markPortraitUnavailable, portraitFor } from './author-avatar.js';
 
@@ -476,7 +477,17 @@ export function mountDiscussion(root, options) {
       const line = el('p', 'discussion-line');
       const body = document.createElement('span');
       body.className = 'discussion-body';
-      body.textContent = ' ' + item.body;
+      body.append(document.createTextNode(' '));
+      mentionParts(item.body, item.mentions).forEach((part) => {
+        if (part.type === 'link') {
+          const link = document.createElement('a');
+          link.href = part.href;
+          link.textContent = part.text;
+          body.append(link);
+          return;
+        }
+        body.append(document.createTextNode(part.text));
+      });
       line.append(authorChip(item.authorName || 'Member', item.authorId), body);
       shell.log.append(line);
     });
@@ -821,11 +832,15 @@ export function mountProfile(root, options) {
     });
     root.append(ratings);
     if (viewer && viewer.id !== person.id) {
+      const message = document.createElement('a');
+      message.className = 'tool';
+      message.href = '/community/messages/?with=' + encodeURIComponent(person.id);
+      message.textContent = 'Message';
       const challenge = document.createElement('a');
       challenge.className = 'tool';
       challenge.href = '/human/?opponent=' + encodeURIComponent(person.id);
       challenge.textContent = 'Challenge to a game';
-      root.append(challenge);
+      root.append(message, challenge);
     }
     root.append(el('p', 'community-note', 'This is a Chess community profile. It does not show an email address or any other service.'));
     if (person.createdAt) root.append(el('p', 'community-time', 'Profile created ' + person.createdAt));
@@ -951,5 +966,97 @@ export function mountProfile(root, options) {
         attempts = null;
       }
     }
+  });
+}
+
+export function mountMessages(root, options) {
+  const gateway = options.gateway || null;
+  let profile = null;
+  let threads = [];
+  let open = null;
+  let error = '';
+  let draft = '';
+
+  function paintThread(parent) {
+    if (!open) return;
+    const title = el('h2', null, open.with && open.with.displayName ? open.with.displayName : 'Conversation');
+    const log = el('div', 'discussion-log');
+    log.id = 'message-log';
+    (open.messages || []).forEach((item) => {
+      const line = el('p', 'discussion-line');
+      line.append(el('span', 'discussion-body', item.body));
+      log.append(line);
+    });
+    const input = document.createElement('textarea');
+    input.id = 'message-body';
+    input.maxLength = 1000;
+    input.rows = 3;
+    input.value = draft;
+    input.addEventListener('input', () => { draft = input.value; });
+    const send = el('button', 'tool', 'Send');
+    send.type = 'button';
+    send.id = 'message-send';
+    send.addEventListener('click', () => { void submit(); });
+    parent.append(title, log, field('Message', input), send);
+  }
+
+  function render() {
+    root.replaceChildren();
+    root.className = 'community';
+    if (!options.configured) {
+      root.append(el('p', null, 'Messages could not be reached. Nothing from them is stored on this device.'));
+      return;
+    }
+    const back = document.createElement('a');
+    back.href = '/community/';
+    back.textContent = 'Community';
+    root.append(back, el('h2', null, 'Messages'));
+    if (error) root.append(el('p', 'community-error', error));
+    if (!profile) {
+      root.append(el('p', 'community-note', 'Sign in and click Join Chess before reading messages.'));
+      return;
+    }
+    if (!open) {
+      if (!threads.length) root.append(el('p', null, 'No messages yet.'));
+      threads.forEach((thread) => {
+        const link = document.createElement('a');
+        link.className = 'entry';
+        link.href = '/community/messages/?with=' + encodeURIComponent(thread.with.id);
+        link.append(el('strong', null, thread.with.displayName || 'Member'), el('span', null, thread.body || ''));
+        root.append(link);
+      });
+      return;
+    }
+    paintThread(root);
+  }
+
+  async function submit() {
+    const result = cleanDiscussion(draft);
+    if (!result.ok) { error = result.error; render(); return; }
+    try {
+      const sent = await gateway.sendMessage(open.with.id, result.value, profile.id);
+      open.messages = (open.messages || []).concat([sent]);
+      draft = '';
+      error = '';
+    } catch (err) {
+      error = err && err.message ? err.message : 'The message could not be sent.';
+    }
+    render();
+  }
+
+  render();
+  if (!options.configured || !gateway) return;
+  gateway.profile().then(async (session) => {
+    profile = session;
+    if (!profile) { render(); return; }
+    if (options.withId) open = await gateway.openMessages(options.withId);
+    else {
+      const inbox = await gateway.listMessages();
+      threads = inbox.threads || [];
+    }
+    render();
+  }).catch((err) => {
+    error = err && err.message ? err.message : 'Messages could not be loaded.';
+    render();
   });
 }

@@ -49,6 +49,7 @@ function setup() {
   psqlFile(db, 'supabase/chess_puzzles.sql');
   psqlFile(db, 'supabase/chess_puzzle_serial.sql');
   psqlFile(db, 'supabase/chess_master_header.sql');
+  psqlFile(db, 'supabase/chess_messages.sql');
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;

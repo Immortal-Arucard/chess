@@ -29,6 +29,8 @@ assert.equal(olderThan({ id: '9', createdAt: '2026-11-07T00:00:00Z' }, cursor), 
 assert.equal(olderThan({ id: 'b', createdAt: '2026-11-08T00:00:02Z' }, cursor), false);
 assert.match(feedFilter(cursor), /created_at\.lt\./);
 assert.equal(communityRoute({ pathname: '/community/discussion/', search: '' }).page, 'discussion');
+assert.equal(communityRoute({ pathname: '/community/messages/', search: '?with=11111111-1111-4111-8111-111111111111' }).page, 'messages');
+assert.equal(communityRoute({ pathname: '/community/messages/', search: '?with=11111111-1111-4111-8111-111111111111' }).withId, '11111111-1111-4111-8111-111111111111');
 assert.equal(communityRoute({ pathname: '/community/profile/', search: '?id=11111111-1111-4111-8111-111111111111' }).page, 'profile');
 assert.equal(profileExitHref('/community/'), '/community/');
 assert.equal(profileExitHref('https://evil.example'), '/community/');
