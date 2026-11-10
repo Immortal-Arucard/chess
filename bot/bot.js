@@ -12,6 +12,7 @@ import {
 import { createEngine } from '/assets/chess/engine.js';
 import { applyUci, kingSquare, legalTargets, outcome, pieceMap, pgnFor, promotionMoves } from '/assets/chess/rules.js';
 import { closeGameStage, requestGameExit, syncGameStage } from '/assets/chess/game-stage.js';
+import { rememberAnalysis } from '/assets/chess/analysis-model.js';
 
 const ENGINE_URL = '/assets/vendor/stockfish/stockfish-19-lite-single.js';
 const SITE = 'https://chess.theworldgovernmentincorporated.com/bot/';
@@ -705,6 +706,9 @@ document.getElementById('discard-result').addEventListener('click', () => {
   notice = 'The unsaved game was discarded. Games already stored in an account are not deleted.';
   returnToSetup();
 });
+document.getElementById('analyze-game').addEventListener('click', () => {
+  rememberAnalysis({ pgn: pgnEl.value, result: manualResult || resultCode(chess) });
+});
 document.getElementById('download-pgn').addEventListener('click', () => {
   const blob = new Blob([pgnEl.value], { type: 'application/x-chess-pgn' });
   const url = URL.createObjectURL(blob);
@@ -857,7 +861,12 @@ async function loadSavedGames(cursor) {
     button.className = 'tool';
     button.textContent = 'Replay ' + game.result;
     button.addEventListener('click', () => openReplay(game));
-    item.append(button);
+    const analyze = document.createElement('a');
+    analyze.className = 'tool';
+    analyze.href = '/analysis/';
+    analyze.textContent = 'Analyze';
+    analyze.addEventListener('click', () => rememberAnalysis({ pgn: game.pgn, result: game.result }));
+    item.append(button, analyze);
     list.append(item);
   });
   if (games.length === 20) {

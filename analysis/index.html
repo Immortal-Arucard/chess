@@ -15,7 +15,9 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=24">
+<link rel="stylesheet" href="/assets/site.css?v=25">
+<link rel="stylesheet" href="/assets/chess/board.css">
+<link rel="stylesheet" href="/assets/chess/analysis.css">
 
 </head>
 <body class="sheet">
@@ -37,12 +39,10 @@
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="https://theworldgovernmentincorporated.com/">Home</a></li><li><a href="https://theworldgovernmentincorporated.com/recreation/">Recreation</a></li><li><a href="/">Chess</a></li><li><span aria-current="page">Game analysis</span></li></ol></nav>
 <main class="page" id="main">
-  <p class="eyebrow">Planned. Not operational.</p>
+  <p class="eyebrow">On-site games and imported games</p>
   <h1>Game analysis</h1>
-  <div class="prose">
-    <p>This page is reserved for analysis of games played on this site and of games imported from elsewhere.</p>
-    <p>No analysis and no import are available. The page is planned and is not operational.</p>
-  </div>
+  <p class="lead">Review a finished game or paste a PGN or FEN. Analysis stays on this device and does not change ratings or stored results.</p>
+  <div id="analysis-app"></div>
   <nav class="page-nav" aria-label="Sections">
   <h2>Sections</h2>
   <ul class="children">
@@ -67,6 +67,7 @@
   </nav>
 </footer>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'});</script>
-<script src="/assets/site.js?v=24"></script>
+<script src="/assets/site.js?v=25"></script>
+<script type="module" src="/analysis/analysis.js?v=25"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-assert.match(sw, /const CACHE = 'chess-v24'/);
+assert.match(sw, /const CACHE = 'chess-v25'/);
 assert.match(sw, /new Request\(url, \{ cache: 'reload' \}\)/);
 assert.match(sw, /cache: 'no-cache'/);
 assert.match(sw, /pathname\.startsWith\('\/api\/'\)\) return/);
