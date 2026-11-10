@@ -72,6 +72,7 @@ export function createAnalysisEngine(workerUrl) {
   return {
     get ready() { return ready && !failed; },
     on(fn) { listeners.add(fn); },
+    off(fn) { listeners.delete(fn); },
     start() {
       worker = new Worker(workerUrl);
       worker.onmessage = (event) => {

@@ -100,6 +100,45 @@ try {
   await page.keyboard.press('ArrowLeft');
   const back = await page.evaluate(() => document.querySelector('.move-tree button.is-here'));
   assert.equal(back, null);
+  await page.evaluate((text) => { document.querySelector('textarea').value = text; }, '1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0');
+  await page.evaluate(() => document.querySelector('.analysis-import').requestSubmit());
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('.move-tree > .move-row')];
+    return rows.length === 4 && rows[3].textContent.includes('Qxf7#');
+  });
+  const numbers = await page.evaluate(() => [...document.querySelectorAll('.move-tree > .move-row .move-no')].map((node) => node.textContent));
+  assert.deepEqual(numbers, ['1.', '2.', '3.', '4.']);
+  assert.equal(await page.evaluate(() => document.querySelectorAll('.move-tree ol').length), 0);
+  const ready = Date.now() + 20000;
+  let sawDepth = false;
+  while (Date.now() < ready) {
+    sawDepth = await page.evaluate(() => {
+      const item = document.querySelector('.engine-lines li');
+      return Boolean(item && item.textContent.includes('Depth'));
+    });
+    if (sawDepth) break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  assert.equal(sawDepth, true);
+  await page.evaluate(() => {
+    const select = document.querySelector('[aria-label="Engine depth or time"]');
+    select.value = '0:300';
+    select.dispatchEvent(new Event('change'));
+    [...document.querySelectorAll('button')].find((button) => button.textContent.startsWith('Review')).click();
+  });
+  await page.waitForFunction(() => document.body.innerText.includes('Review finished'), { timeout: 40000 });
+  const graded = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.move-row')].find((item) => item.textContent.includes('Qxf7#'));
+    const accuracy = [...document.querySelectorAll('.analysis-accuracy')].map((node) => node.textContent).find((text) => text.startsWith('Accuracy')) || '';
+    return { move: row ? row.textContent.replace(/\s+/g, ' ') : '', accuracy };
+  });
+  assert.match(graded.move, /Qxf7#/);
+  assert.match(graded.move, /Best/);
+  assert.match(graded.accuracy, /^Accuracy White \d+ · Black \d+$/);
+  await page.setViewport({ width: 390, height: 800 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1), false, '390 move list overflow');
+  await page.setViewport({ width: 1280, height: 800 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1), false, '1280 move list overflow');
   await page.evaluate((text) => { document.querySelector('textarea').value = text; }, 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1');
   await page.evaluate(() => document.querySelector('.analysis-import').requestSubmit());
   await page.waitForFunction(() => {

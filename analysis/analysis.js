@@ -5,16 +5,19 @@ import { applyUci, kingSquare, legalTargets, outcome, pieceMap } from '/assets/c
 import { createAnalysisEngine } from '/assets/chess/analysis-engine.js';
 import {
   addChild,
-  classifyLoss,
+  gradeMove,
   loadPgnGame,
   mainlineAt,
   mainlineNodes,
+  moveRows,
   moverLoss,
   onMainline,
   parseFen,
   readAnalysis,
   rememberAnalysis,
   sideAccuracy,
+  sideLabel,
+  sideVariations,
   splitPgnGames,
   treeFromLine,
   whiteCp
@@ -138,8 +141,13 @@ async function review() {
   mainlineNodes(tree).forEach((node) => {
     const mover = turnOf(node.fen) === 'w' ? 'b' : 'w';
     const loss = moverLoss(node.parent.evalCp, node.evalCp, mover);
-    node.loss = loss;
-    node.mark = classifyLoss(loss, node.uci === node.parent.best);
+    const graded = gradeMove({
+      lossCp: loss,
+      matchedBest: node.uci === node.parent.best,
+      checkmate: chessAt(node).isCheckmate()
+    });
+    node.loss = graded.lossCp;
+    node.mark = graded.mark;
   });
   reviewing = false;
   notice = 'Review finished. Ratings and stored results were not changed.';
@@ -148,11 +156,14 @@ async function review() {
 
 function once(fen) {
   return new Promise((resolve) => {
-    const tokenAt = engine.search(fen, { multipv: 1, depth: movetime ? 0 : depth, ms: movetime || 300 });
-    if (!tokenAt) { resolve(null); return; }
+    if (!engine.search(fen, { multipv: 1, depth: movetime ? 0 : depth, ms: movetime || 300 })) {
+      resolve(null);
+      return;
+    }
     const listener = (type, detail) => {
-      if (type === 'done' && detail.fen === fen) {
-        resolve(detail);
+      if (type === 'error' || (type === 'done' && detail.fen === fen)) {
+        engine.off(listener);
+        resolve(type === 'done' ? detail : null);
       }
     };
     engine.on(listener);
@@ -170,24 +181,30 @@ function accuracy() {
   return { white: sideAccuracy(white), black: sideAccuracy(black) };
 }
 
-function renderTree(node, list) {
-  node.children.forEach((child, index) => {
-    const item = el('li');
-    const button = el('button', child === current ? 'is-here' : '', (index === 0 ? '' : '') + child.san);
-    button.type = 'button';
-    button.textContent = child.san;
-    if (child.mark) {
-      const mark = el('span', 'mark mark-' + child.mark.toLowerCase(), child.mark);
-      button.append(mark);
-    }
-    button.addEventListener('click', () => go(child));
-    item.append(button);
-    if (child.children.length) {
-      const nested = el('ol');
-      renderTree(child, nested);
-      item.append(nested);
-    }
-    list.append(item);
+function moveButton(node) {
+  const button = el('button', node === current ? 'is-here' : '');
+  button.type = 'button';
+  button.append(document.createTextNode(node.san));
+  if (node.mark) button.append(el('span', 'mark mark-' + node.mark.toLowerCase(), node.mark));
+  button.addEventListener('click', () => go(node));
+  return button;
+}
+
+function renderLine(lineStart, host) {
+  moveRows(lineStart).forEach((row) => {
+    const item = el('div', 'move-row');
+    item.append(el('span', 'move-no', row.number + (row.white ? '.' : '...')));
+    if (row.white) item.append(moveButton(row.white));
+    if (row.black) item.append(moveButton(row.black));
+    host.append(item);
+    const branches = [];
+    if (row.white) branches.push(...sideVariations(row.white));
+    if (row.black) branches.push(...sideVariations(row.black));
+    branches.forEach((variation) => {
+      const nest = el('div', 'move-vars');
+      renderLine(variation, nest);
+      host.append(nest);
+    });
   });
 }
 
@@ -276,7 +293,7 @@ function render() {
   if (tree) {
     const scores = accuracy();
     if (scores.white != null || scores.black != null) {
-      root.append(el('p', 'analysis-accuracy', 'Accuracy ' + headers.white + ' ' + (scores.white == null ? '—' : scores.white) + ' · ' + headers.black + ' ' + (scores.black == null ? '—' : scores.black)));
+      root.append(el('p', 'analysis-accuracy', 'Accuracy ' + sideLabel(headers.white, 'White') + ' ' + (scores.white == null ? '—' : scores.white) + ' · ' + sideLabel(headers.black, 'Black') + ' ' + (scores.black == null ? '—' : scores.black)));
     }
   }
   const layout = el('div', 'analysis-layout');
@@ -315,8 +332,8 @@ function render() {
       point.addEventListener('click', () => go(node));
       graph.append(point);
     });
-    const moves = el('ol', 'move-tree');
-    renderTree(tree, moves);
+    const moves = el('div', 'move-tree');
+    if (tree.children[0]) renderLine(tree.children[0], moves);
     side.append(graph, moves);
   }
   layout.append(stage, side);

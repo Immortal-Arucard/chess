@@ -20,8 +20,11 @@ a.tool{display:inline-flex;align-items:center;text-decoration:none}
 .eval-graph{display:flex;align-items:flex-end;gap:2px;height:72px;margin:8px 0}
 .eval-graph button{flex:1 1 4px;min-width:4px;padding:0;border:0;background:#4fc3ff;cursor:pointer}
 .eval-graph button.is-here{outline:2px solid #fff}
-.move-tree,.move-tree ol{margin:0;padding-left:1rem}
-.move-tree button{appearance:none;border:0;background:transparent;color:#e8e8e8;font:inherit;text-align:left;cursor:pointer;min-height:32px}
+.move-tree{margin:0;padding:0}
+.move-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0}
+.move-no{color:var(--mute);min-width:1.6rem}
+.move-vars{margin:0 0 4px 1.25rem;padding-left:8px;border-left:2px solid var(--line)}
+.move-tree button{appearance:none;border:0;background:transparent;color:#e8e8e8;font:inherit;text-align:left;cursor:pointer;min-height:32px;padding:0}
 .move-tree button.is-here{color:#4fc3ff}
 .mark{margin-left:6px;font-size:12px;color:#4fc3ff}
 .mark-blunder{color:#ffb4b4}

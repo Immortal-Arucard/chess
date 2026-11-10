@@ -42,8 +42,8 @@ export function loadPgnGame(pgn) {
     ucis: verbose.map((move) => move.from + move.to + (move.promotion || '')),
     fens: verbose.map((move) => move.after),
     headers: {
-      white: chess.getHeaders().White || 'White',
-      black: chess.getHeaders().Black || 'Black',
+      white: sideLabel(chess.getHeaders().White, 'White'),
+      black: sideLabel(chess.getHeaders().Black, 'Black'),
       result: chess.getHeaders().Result || '*'
     },
     pgn: chess.pgn()
@@ -137,6 +137,63 @@ export function classifyLoss(lossCp, matchedBest) {
   if (lossCp <= CLASS_LIMITS.inaccuracy) return 'Inaccuracy';
   if (lossCp <= CLASS_LIMITS.mistake) return 'Mistake';
   return 'Blunder';
+}
+
+export function sideLabel(name, fallback) {
+  const text = String(name || '').trim();
+  if (!text || text === '?' || text === '??') return fallback;
+  return text;
+}
+
+export function gradeMove({ lossCp, matchedBest, checkmate }) {
+  if (checkmate) return { mark: 'Best', lossCp: 0 };
+  return { mark: classifyLoss(lossCp, matchedBest), lossCp };
+}
+
+export function plyOf(node) {
+  let ply = 0;
+  let cursor = node;
+  while (cursor && cursor.parent) {
+    ply += 1;
+    cursor = cursor.parent;
+  }
+  return ply;
+}
+
+export function sideVariations(node) {
+  if (!node || !node.parent) return [];
+  const main = node.parent.children[0];
+  return node.parent.children.filter((child) => child !== node && child !== main);
+}
+
+export function moveRows(lineStart) {
+  if (!lineStart) return [];
+  let root = lineStart;
+  while (root.parent) root = root.parent;
+  const whiteFirst = String(root.fen || '').split(' ')[1] !== 'b';
+  const nodes = [lineStart];
+  let cursor = lineStart;
+  while (cursor.children[0]) {
+    cursor = cursor.children[0];
+    nodes.push(cursor);
+  }
+  const whiteMove = (node) => {
+    const ply = plyOf(node);
+    return whiteFirst ? ply % 2 === 1 : ply % 2 === 0;
+  };
+  const rows = [];
+  let index = 0;
+  if (!whiteMove(nodes[0])) {
+    rows.push({ number: Math.ceil(plyOf(nodes[0]) / 2), white: null, black: nodes[0] });
+    index = 1;
+  }
+  while (index < nodes.length) {
+    const white = nodes[index];
+    const black = nodes[index + 1] && !whiteMove(nodes[index + 1]) ? nodes[index + 1] : null;
+    rows.push({ number: Math.ceil(plyOf(white) / 2), white, black });
+    index += black ? 2 : 1;
+  }
+  return rows;
 }
 
 export function moveAccuracy(lossCp) {
