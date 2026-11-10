@@ -270,6 +270,8 @@ async function render() {
     orders.href = '/marketplace/?orders=1';
     const sales = el('a', 'tool', 'My sales');
     sales.href = '/marketplace/?sales=1';
+    const trades = el('a', 'tool', 'My trades');
+    trades.href = '/marketplace/?trades=1';
     const payouts = el('button', 'tool', 'Seller payouts');
     payouts.type = 'button';
     payouts.addEventListener('click', () => {
@@ -278,12 +280,22 @@ async function render() {
         else root.append(el('p', 'market-banner', 'Checkout not yet enabled'));
       }).catch((err) => root.append(el('p', null, err.message)));
     });
-    tools.append(sell, orders, sales, payouts);
+    const dashboard = el('button', 'tool', 'Express dashboard');
+    dashboard.type = 'button';
+    dashboard.addEventListener('click', () => {
+      post('/api/market/connect/login', {}).then((result) => {
+        if (result.url) location.assign(result.url);
+        else root.append(el('p', 'market-banner', 'Checkout not yet enabled'));
+      }).catch((err) => root.append(el('p', null, err.message)));
+    });
+    tools.append(sell, orders, sales, trades, payouts, dashboard);
   }
   if (config.admin) {
     const queue = el('a', 'tool', 'Moderation');
     queue.href = '/marketplace/?moderation=1';
-    tools.append(queue);
+    const disputes = el('a', 'tool', 'Disputes');
+    disputes.href = '/marketplace/?disputes=1';
+    tools.append(queue, disputes);
   }
   root.append(tools);
   if (params.get('listing')) {
@@ -295,6 +307,39 @@ async function render() {
     root.append(listingForm(config.profileId ? '' : 'Sign in and join Chess before selling.'));
     return;
   }
+  if (params.get('trades') === '1') {
+    const body = await get('/api/market/trades');
+    const list = el('div', 'market-grid');
+    (body.trades || []).forEach((trade) => {
+      const item = el('article', 'market-card');
+      item.append(el('p', null, trade.status + (trade.cashCents ? ' · cash ' + money(trade.cashCents) : '')));
+      if (trade.canPay) {
+        const pay = el('button', 'tool', config.checkoutEnabled ? 'Pay the cash' : 'Checkout not yet enabled');
+        pay.type = 'button';
+        pay.disabled = !config.checkoutEnabled;
+        pay.addEventListener('click', () => {
+          post('/api/market/trades/' + trade.id + '/checkout', {}).then((result) => {
+            if (result.url) location.assign(result.url);
+          }).catch((err) => item.append(el('p', null, err.message)));
+        });
+        item.append(pay);
+      }
+      list.append(item);
+    });
+    root.append(list);
+    return;
+  }
+  if (params.get('disputes') === '1' && config.admin) {
+    const body = await get('/api/market/disputes');
+    const list = el('div', 'market-grid');
+    (body.disputes || []).forEach((dispute) => {
+      const item = el('article', 'market-card');
+      item.append(el('p', null, dispute.title + ' · ' + (dispute.disputeStatus || dispute.status) + (dispute.reversalNeeded ? ' · reversal needed' : '')));
+      list.append(item);
+    });
+    root.append(list);
+    return;
+  }
   if (params.get('orders') === '1' || params.get('sales') === '1') {
     const path = params.get('sales') === '1' ? '/api/market/sales' : '/api/market/orders';
     const body = await get(path);
@@ -302,6 +347,7 @@ async function render() {
     (body.orders || []).forEach((order) => {
       const item = el('article', 'market-card');
       item.append(el('p', null, order.title + ' · ' + money(order.totalCents) + ' · ' + order.status));
+      if (order.shipLine1) item.append(el('p', null, [order.shipName, order.shipLine1, order.shipCity, order.shipState, order.shipPostal, order.shipCountry].filter(Boolean).join(', ')));
       if (params.get('sales') === '1' && order.status === 'paid') {
         const ship = el('button', 'tool', 'Mark shipped');
         ship.type = 'button';
