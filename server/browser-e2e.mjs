@@ -293,6 +293,10 @@ try {
   await page.evaluate(() => document.getElementById('autosave-bot').click());
   await page.waitForFunction(() => document.getElementById('autosave-note').textContent.includes('Finished bot games are saved'));
   await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => {
+    const note = document.getElementById('autosave-note');
+    return note && note.textContent.includes('Finished bot games are saved');
+  });
   const checked = await page.$eval('#autosave-bot', (el) => el.checked);
   if (!checked) throw new Error('autosave did not persist');
   await page.goto(origin + '/community/', { waitUntil: 'domcontentloaded' });
