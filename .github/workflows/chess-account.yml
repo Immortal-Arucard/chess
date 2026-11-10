@@ -55,6 +55,7 @@ jobs:
       - run: node server/exchange-match.test.mjs
       - run: node server/market.test.mjs
       - run: node server/market-stripe.test.mjs
+      - run: node server/market-events.test.mjs
       - run: node server/market.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome

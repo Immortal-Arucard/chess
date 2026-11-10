@@ -85,6 +85,14 @@ export function recipientAccountFallback(profileId) {
   return params;
 }
 
+function connectedAccountId(event, object) {
+  if (event && typeof event.account === 'string' && event.account) return event.account;
+  if (object.object === 'account' && object.id) return object.id;
+  if (typeof object.account === 'string' && object.account) return object.account;
+  if (event && event.type === 'account.application.deauthorized' && object.id) return object.id;
+  return '';
+}
+
 export function stripeEventPayload(event) {
   const object = event && event.data && event.data.object ? event.data.object : {};
   const metadata = object.metadata || {};
@@ -99,12 +107,14 @@ export function stripeEventPayload(event) {
     paymentStatus: object.payment_status || '',
     paymentIntent: typeof object.payment_intent === 'string' ? object.payment_intent : '',
     sessionId: object.object === 'checkout.session' ? object.id || '' : '',
-    transferId: typeof object.transfer === 'string' ? object.transfer : '',
+    transferId: object.object === 'transfer' && object.id ? object.id : (typeof object.transfer === 'string' ? object.transfer : ''),
+    chargeId: object.object === 'charge' && object.id ? object.id : (typeof object.source_transaction === 'string' ? object.source_transaction : ''),
+    transferGroup: typeof object.transfer_group === 'string' ? object.transfer_group : '',
     amount: Number.isInteger(object.amount) ? object.amount : '',
     amountRefunded: Number.isInteger(object.amount_refunded) ? object.amount_refunded : '',
     disputeId: object.object === 'dispute' ? object.id || '' : '',
     disputeStatus: object.object === 'dispute' ? object.status || '' : '',
-    accountId: object.object === 'account' ? object.id || '' : (object.account || ''),
+    accountId: connectedAccountId(event, object),
     chargesEnabled: object.charges_enabled === true,
     transfersActive: transfersActive === true,
     payoutsEnabled: object.payouts_enabled === true,
