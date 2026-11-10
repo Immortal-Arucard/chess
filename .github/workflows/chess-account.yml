@@ -50,6 +50,12 @@ jobs:
       - run: node assets/chess/push-client.test.mjs
       - run: node server/push.test.mjs
       - run: node server/private-execute.test.mjs
+      - run: node server/exchange-ratings.test.mjs
+      - run: node server/exchange-catalog.test.mjs
+      - run: node server/exchange-match.test.mjs
+      - run: node server/exchange.browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - run: node server/dm-avatars.browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome

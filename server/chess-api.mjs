@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { validateGame } from './game-record.mjs';
 import { handleHumanGet, handleHumanPost } from './human-api.mjs';
 import { handlePuzzleGet, handlePuzzlePost } from './puzzle-api.mjs';
+import { handleExchangeGet, handleExchangePost } from './exchange-api.mjs';
 import { sanitizeProfileImage } from './profile-image.mjs';
 import { createSupabaseAuth } from './supabase-auth.mjs';
 
@@ -141,7 +142,19 @@ function publicError(error) {
     'Choose another Chess member.',
     'That conversation was not found.',
     'A direct message must be 1 to 1000 characters.',
-    'You can message only as your own Chess profile.'
+    'You can message only as your own Chess profile.',
+    'That market was not found.',
+    'That instrument was not found.',
+    'That order was not found.',
+    'Enter a whole number of shares from 1 to 100000.',
+    'Enter a limit price in whole AMU.',
+    'Choose buy or sell.',
+    'Choose a limit or market order.',
+    'You do not have enough AMU for that order.',
+    'You do not have enough shares for that order.',
+    'That order would trade against your own resting order.',
+    'The book had no shares you could buy.',
+    'The book had no bid for that sale.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
@@ -386,6 +399,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const puzzle = await handlePuzzleGet({ url, token, query, send });
         if (puzzle !== false) return;
       }
+      if (req.method === 'GET' && url.pathname.startsWith('/api/exchange')) {
+        const exchange = await handleExchangeGet({ url, token, query, send });
+        if (exchange !== false) return;
+      }
       if (req.method !== 'POST') return send(405, { error: 'Method not allowed.' });
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
       if (url.pathname === '/api/auth/start') {
@@ -556,6 +573,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (url.pathname.startsWith('/api/puzzles')) {
         const puzzle = await handlePuzzlePost({ url, token, body, query, send });
         if (puzzle !== false) return;
+      }
+      if (url.pathname.startsWith('/api/exchange')) {
+        const exchange = await handleExchangePost({ url, token, body, query, send });
+        if (exchange !== false) return;
       }
       if (url.pathname === '/api/games/list') {
         const result = await query('select chess_service.game_page($1, $2, $3, $4) as games', [
