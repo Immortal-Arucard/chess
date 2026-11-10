@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-assert.match(sw, /const CACHE = 'chess-v27'/);
+assert.match(sw, /const CACHE = 'chess-v28'/);
 assert.match(sw, /\/exchange\/exchange.js/);
 assert.match(sw, /\/exchange\/instruments.json/);
 assert.match(sw, /new Request\(url, \{ cache: 'reload' \}\)/);

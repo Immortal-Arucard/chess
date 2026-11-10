@@ -4,6 +4,7 @@ import { validateGame } from './game-record.mjs';
 import { handleHumanGet, handleHumanPost } from './human-api.mjs';
 import { handlePuzzleGet, handlePuzzlePost } from './puzzle-api.mjs';
 import { handleExchangeGet, handleExchangePost } from './exchange-api.mjs';
+import { handleMarketGet, handleMarketPhoto, handleMarketPost, handleMarketWebhook } from './market-api.mjs';
 import { sanitizeProfileImage } from './profile-image.mjs';
 import { createSupabaseAuth } from './supabase-auth.mjs';
 
@@ -154,7 +155,29 @@ function publicError(error) {
     'You do not have enough shares for that order.',
     'That order would trade against your own resting order.',
     'The book had no shares you could buy.',
-    'The book had no bid for that sale.'
+    'The book had no bid for that sale.',
+    'Choose a chess category.',
+    'Choose a condition.',
+    'Choose shipping, pickup, or digital.',
+    'Enter a title of 1 to 80 characters.',
+    'Enter a description of 1 to 4000 characters.',
+    'Enter a price and a quantity.',
+    'Enter a city or region.',
+    'That listing was not found.',
+    'A listing can have at most 4 photos.',
+    'Choose a report reason.',
+    'Choose hide, remove, or restore.',
+    'You cannot buy your own listing.',
+    'That listing does not have enough left.',
+    'Checkout not yet enabled',
+    'Checkout could not start.',
+    'That order is not ready to ship.',
+    'Offer a listing of your own.',
+    'That listing is not open to trades.',
+    'Enter the cash for this trade.',
+    'That trade is no longer open.',
+    'That notification setting is not available.',
+    'The Stripe event could not be verified.'
   ];
   if (message.startsWith('Too many ') && message.length < 80) return message;
   if (allowed.includes(message)) return message;
@@ -199,7 +222,7 @@ const AUTH_HEADERS = {
   'x-content-type-options': 'nosniff'
 };
 
-export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchImpl, deliver, vapidPublicKey }) {
+export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchImpl, deliver, vapidPublicKey, stripe }) {
   const master = createSupabaseAuth({ url: supabaseUrl, apiKey: supabaseKey, fetchImpl: fetchImpl || fetch });
   async function query(text, params) {
     const client = await pool.connect();
@@ -403,6 +426,13 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
         const exchange = await handleExchangeGet({ url, token, query, send });
         if (exchange !== false) return;
       }
+      if (req.method === 'GET' && url.pathname.startsWith('/api/market')) {
+        const market = await handleMarketGet({ url, token, query, send, res, stripe });
+        if (market !== false) return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/market/stripe/webhook') {
+        return handleMarketWebhook({ req, query, send, stripe });
+      }
       if (req.method !== 'POST') return send(405, { error: 'Method not allowed.' });
       if (!allowsMutation(req)) return send(403, { error: 'The request origin is not this Chess site.' });
       if (url.pathname === '/api/auth/start') {
@@ -438,6 +468,9 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       const sessionCheck = await query('select chess_service.chess_session($1) as session', [token]);
       if (!sessionCheck.rows[0].session.authenticated) return send(401, { error: 'Sign in before doing that.' });
       if (!(await csrfOk(req, token))) return send(403, { error: 'The security token did not match this session.' });
+      if (url.pathname.match(/^\/api\/market\/listings\/[0-9a-f-]{36}\/photo$/i)) {
+        return handleMarketPhoto({ url, token, req, query, send });
+      }
       if (url.pathname === '/api/profile/portrait' || url.pathname === '/api/profile/background') {
         const kind = url.pathname.endsWith('portrait') ? 'portrait' : 'background';
         const authorId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.headers['x-chess-profile'] || ''))
@@ -577,6 +610,10 @@ export function createChessApp({ pool, origin, supabaseUrl, supabaseKey, fetchIm
       if (url.pathname.startsWith('/api/exchange')) {
         const exchange = await handleExchangePost({ url, token, body, query, send });
         if (exchange !== false) return;
+      }
+      if (url.pathname.startsWith('/api/market')) {
+        const market = await handleMarketPost({ url, token, body, query, send, stripe, origin });
+        if (market !== false) return;
       }
       if (url.pathname === '/api/games/list') {
         const result = await query('select chess_service.game_page($1, $2, $3, $4) as games', [

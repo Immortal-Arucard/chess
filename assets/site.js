@@ -175,10 +175,10 @@
 })();
 
 function startAccountMenu() {
-  import('/assets/chess/account-menu.js?v=26').catch(function () { /* the header stays usable without the account control */ });
+  import('/assets/chess/account-menu.js?v=28').catch(function () { /* the header stays usable without the account control */ });
 }
 var sectionRegistry = document.createElement('script');
-sectionRegistry.src = '/assets/account-sections.js?v=26';
+sectionRegistry.src = '/assets/account-sections.js?v=28';
 sectionRegistry.onload = startAccountMenu;
 sectionRegistry.onerror = startAccountMenu;
 document.body.appendChild(sectionRegistry);
