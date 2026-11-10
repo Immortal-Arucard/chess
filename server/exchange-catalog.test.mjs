@@ -12,7 +12,7 @@ assert.equal((sql.match(/\bbegin\s*;/gi) || []).length, 1);
 assert.equal((sql.match(/\bcommit\s*;/gi) || []).length, 1);
 assert.match(sql, /amount = 1000000000000/);
 assert.match(sql, /exchange_markets_not_live check \(live = false\)/);
-assert.match(sw, /const CACHE = 'chess-v28'/);
+assert.match(sw, /const CACHE = 'chess-v29'/);
 
 const ids = new Set();
 for (const market of catalog.markets) {

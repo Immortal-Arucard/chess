@@ -53,6 +53,7 @@ function setup() {
   psqlFile(db, 'supabase/chess_push.sql');
   psqlFile(db, 'supabase/chess_private_execute.sql');
   psqlFile(db, 'supabase/chess_market.sql');
+  psqlFile(db, 'supabase/chess_market_stripe.sql');
   psql(db, `
     alter role chess_server login password '${password}';
     grant connect on database ${db} to chess_server;

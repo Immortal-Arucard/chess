@@ -19,5 +19,6 @@ export const PUSH_KINDS = [
   ['market_accepted', 'Listing trade accepted'],
   ['market_declined', 'Listing trade declined'],
   ['market_order', 'Listing order'],
-  ['market_shipped', 'Listing shipped']
+  ['market_shipped', 'Listing shipped'],
+  ['market_dispute', 'Listing dispute']
 ];

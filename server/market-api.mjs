@@ -1,5 +1,5 @@
 import { sanitizeProfileImage } from './profile-image.mjs';
-import { checkoutBody, feeCents, stripeForm, stripeSignatureValid } from './market-stripe.mjs';
+import { checkoutBody, checkoutEnabled, createRecipientAccount, feeCents, platformFeeBps, reverseTransfer, stripeEventPayload, stripeForm, stripeSignatureValid } from './market-stripe.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -17,13 +17,7 @@ function idOf(value) {
 }
 
 function feeBps(stripe) {
-  const parsed = Number(stripe && stripe.feeBps);
-  if (!Number.isInteger(parsed)) return 0;
-  return Math.min(10000, Math.max(0, parsed));
-}
-
-export function checkoutEnabled(stripe) {
-  return !!(stripe && typeof stripe.secretKey === 'string' && stripe.secretKey.startsWith('sk_'));
+  return platformFeeBps(stripe && stripe.feeBps);
 }
 
 async function readBounded(req, max) {
@@ -92,6 +86,14 @@ export async function handleMarketGet({ url, token, query, send, res, stripe }) 
     const result = await query('select chess_service.market_queue($1) as queue', [token]);
     return send(200, { listings: result.rows[0].queue });
   }
+  if (url.pathname === '/api/market/disputes') {
+    const result = await query('select chess_service.market_disputes($1) as disputes', [token]);
+    return send(200, { disputes: result.rows[0].disputes });
+  }
+  if (url.pathname === '/api/market/trades') {
+    const result = await query('select chess_service.market_trades($1) as trades', [token]);
+    return send(200, { trades: result.rows[0].trades });
+  }
   return false;
 }
 
@@ -103,17 +105,14 @@ export async function handleMarketWebhook({ req, query, send, stripe }) {
   }
   let event;
   try { event = JSON.parse(text); } catch (err) { return send(400, { error: 'The Stripe event could not be verified.' }); }
-  const object = event.data && event.data.object ? event.data.object : {};
-  const payload = {
-    orderId: object.metadata && object.metadata.order_id ? object.metadata.order_id : (object.metadata && object.metadata.orderId) || '',
-    paymentStatus: object.payment_status || '',
-    paymentIntent: typeof object.payment_intent === 'string' ? object.payment_intent : '',
-    accountId: object.id && String(object.id).startsWith('acct_') ? object.id : (object.account || ''),
-    chargesEnabled: object.charges_enabled === true,
-    payoutsEnabled: object.payouts_enabled === true,
-    detailsSubmitted: object.details_submitted === true
-  };
-  await query('select chess_service.market_stripe_apply($1, $2, $3::jsonb)', [String(event.id || ''), String(event.type || ''), JSON.stringify(payload)]);
+  const payload = stripeEventPayload(event);
+  const applied = await query('select chess_service.market_stripe_apply($1, $2, $3::jsonb) as action', [String(event.id || ''), String(event.type || ''), JSON.stringify(payload)]);
+  const rawAction = applied.rows[0] && applied.rows[0].action;
+  const action = typeof rawAction === 'string' ? JSON.parse(rawAction) : rawAction;
+  if (action && action.reverseTransfer && checkoutEnabled(stripe)) {
+    const reversed = await reverseTransfer(stripe.fetchImpl || fetch, stripe.secretKey, action.reverseTransfer);
+    if (action.orderId) await query('select chess_service.market_reversal_note($1, $2)', [action.orderId, reversed]);
+  }
   return send(200, { received: true });
 }
 
@@ -145,14 +144,11 @@ export async function handleMarketPost({ url, token, body, query, send, stripe, 
   if (url.pathname === '/api/market/connect') {
     if (!checkoutEnabled(stripe)) return send(200, { checkoutEnabled: false, error: 'Checkout not yet enabled' });
     const existing = await query('select chess_service.market_seller($1) as seller', [token]);
+    const who = await query('select chess_service.market_config($1) as market', [token]);
     let accountId = existing.rows[0].seller && existing.rows[0].seller.accountId;
+    const profileId = who.rows[0].market && who.rows[0].market.profileId;
     if (!accountId) {
-      const params = new URLSearchParams();
-      params.set('type', 'express');
-      params.set('country', 'US');
-      params.set('capabilities[card_payments][requested]', 'true');
-      params.set('capabilities[transfers][requested]', 'true');
-      const account = await stripeForm(stripe.fetchImpl || fetch, stripe.secretKey, 'accounts', params);
+      const account = await createRecipientAccount(stripe.fetchImpl || fetch, stripe.secretKey, profileId || 'seller');
       accountId = account.id;
       await query('select chess_service.market_seller_set($1, $2)', [token, accountId]);
     }
@@ -169,6 +165,7 @@ export async function handleMarketPost({ url, token, body, query, send, stripe, 
     if (!checkoutEnabled(stripe)) return send(200, { checkoutEnabled: false, error: 'Checkout not yet enabled' });
     const opened = await query('select chess_service.market_order_open($1, $2, $3, $4) as order', [token, buy[1], Number(body.quantity || 1), feeBps(stripe)]);
     const order = opened.rows[0].order;
+    if (order.checkoutUrl) return send(200, { url: order.checkoutUrl, checkoutEnabled: true });
     const session = await stripeForm(stripe.fetchImpl || fetch, stripe.secretKey, 'checkout/sessions', checkoutBody({
       orderId: order.orderId,
       title: order.title,
@@ -176,11 +173,20 @@ export async function handleMarketPost({ url, token, body, query, send, stripe, 
       unitCents: order.unitCents,
       feeBps: feeBps(stripe),
       destination: order.destination,
+      fulfillment: order.fulfillment,
       successUrl: origin + '/marketplace/?orders=1',
       cancelUrl: origin + '/marketplace/?listing=' + buy[1]
-    }));
-    await query('select chess_service.market_order_session($1, $2)', [order.orderId, session.id]);
+    }), 'chess-checkout-' + order.orderId);
+    await query('select chess_service.market_checkout_bind($1, $2, $3)', [order.orderId, session.id, session.url]);
     return send(200, { url: session.url, checkoutEnabled: true });
+  }
+  if (url.pathname === '/api/market/connect/login') {
+    if (!checkoutEnabled(stripe)) return send(200, { checkoutEnabled: false, error: 'Checkout not yet enabled' });
+    const seller = await query('select chess_service.market_seller($1) as seller', [token]);
+    const accountId = seller.rows[0].seller && seller.rows[0].seller.accountId;
+    if (!accountId) return send(200, { checkoutEnabled: true, error: 'Checkout not yet enabled' });
+    const link = await stripeForm(stripe.fetchImpl || fetch, stripe.secretKey, 'accounts/' + encodeURIComponent(accountId) + '/login_links', new URLSearchParams());
+    return send(200, { url: link.url, checkoutEnabled: true });
   }
   const ship = url.pathname.match(/^\/api\/market\/orders\/([0-9a-f-]{36})\/ship$/i);
   if (ship) {
@@ -192,6 +198,26 @@ export async function handleMarketPost({ url, token, body, query, send, stripe, 
       token, idOf(body.offeredId), idOf(body.requestedId), Number(body.cashCents || 0), body.cashPayer || 'none'
     ]);
     return send(200, result.rows[0].trade);
+  }
+  const tradePay = url.pathname.match(/^\/api\/market\/trades\/([0-9a-f-]{36})\/checkout$/i);
+  if (tradePay) {
+    if (!checkoutEnabled(stripe)) return send(200, { checkoutEnabled: false, error: 'Checkout not yet enabled' });
+    const opened = await query('select chess_service.market_trade_checkout($1, $2) as order', [token, tradePay[1]]);
+    const order = opened.rows[0].order;
+    if (order.checkoutUrl) return send(200, { url: order.checkoutUrl, checkoutEnabled: true });
+    const session = await stripeForm(stripe.fetchImpl || fetch, stripe.secretKey, 'checkout/sessions', checkoutBody({
+      orderId: order.orderId,
+      title: order.title,
+      quantity: order.quantity,
+      unitCents: order.unitCents,
+      feeBps: feeBps(stripe),
+      destination: order.destination,
+      fulfillment: order.fulfillment,
+      successUrl: origin + '/marketplace/?trades=1',
+      cancelUrl: origin + '/marketplace/?trades=1'
+    }), 'chess-trade-' + order.orderId);
+    await query('select chess_service.market_checkout_bind($1, $2, $3)', [order.orderId, session.id, session.url]);
+    return send(200, { url: session.url, checkoutEnabled: true });
   }
   const answer = url.pathname.match(/^\/api\/market\/trades\/([0-9a-f-]{36})\/(accept|decline)$/i);
   if (answer) {
