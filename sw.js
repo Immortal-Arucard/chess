@@ -1,4 +1,4 @@
-const CACHE = 'chess-v23';
+const CACHE = 'chess-v24';
 const ROUTES = [
   '/',
   '/theory/',

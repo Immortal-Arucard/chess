@@ -1,4 +1,5 @@
 import { profilePath } from './community-model.js';
+import { httpsUrl, initials } from '../master-account.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const PORTRAIT_CACHE_LIMIT = 32;
@@ -101,6 +102,58 @@ export function forgetAuthorPortrait(id) {
   displays.delete(key);
   const index = recent.indexOf(key);
   if (index !== -1) recent.splice(index, 1);
+}
+
+export function authorMini(name, id, options) {
+  const label = String(name || 'Member');
+  const wrap = document.createElement('span');
+  wrap.className = 'author-mini';
+  wrap.setAttribute('role', 'img');
+  wrap.setAttribute('aria-label', label);
+  const avatar = document.createElement('span');
+  avatar.className = 'author-avatar is-pending';
+  avatar.setAttribute('aria-hidden', 'true');
+  wrap.append(avatar);
+  const fallbackUrl = httpsUrl(options && options.avatarUrl);
+  const letters = initials(label);
+  const key = String(id || '');
+  const started = generationOf(key);
+  function paintInitials() {
+    avatar.className = 'author-avatar is-initials';
+    avatar.replaceChildren();
+    avatar.textContent = letters;
+  }
+  function paintGoogle() {
+    if (!fallbackUrl) { paintInitials(); return; }
+    avatar.className = 'author-avatar is-picture';
+    avatar.replaceChildren();
+    const img = document.createElement('img');
+    img.alt = '';
+    img.width = 32;
+    img.height = 32;
+    img.draggable = false;
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => {
+      if (!elementShown(avatar)) return;
+      paintInitials();
+    });
+    img.src = fallbackUrl;
+    avatar.append(img);
+  }
+  function paint(result) {
+    if (result && result.status === 'image' && result.url) {
+      paintAvatar(avatar, result, key);
+      return;
+    }
+    if (!result || result.status === 'absent' || result.status === 'unavailable' || result.status === 'stale') {
+      paintGoogle();
+    }
+  }
+  portraitFor(key).then((result) => {
+    if (!elementShown(avatar) || generationOf(key) !== started) return;
+    paint(result);
+  });
+  return wrap;
 }
 
 export function authorChip(name, id, options) {
@@ -208,7 +261,7 @@ async function readPortrait(id) {
   if (!UUID.test(id)) return { status: 'absent' };
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'unavailable', ephemeral: true };
   try {
-    const response = await fetch('/api/profiles/' + encodeURIComponent(id) + '/portrait', {
+    const response = await globalThis.fetch('/api/profiles/' + encodeURIComponent(id) + '/portrait', {
       credentials: 'same-origin',
       cache: 'no-store'
     });

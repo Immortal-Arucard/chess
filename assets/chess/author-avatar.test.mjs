@@ -61,7 +61,7 @@ URL.revokeObjectURL = (url) => revoked.push(url);
 let clock = 100000;
 Date.now = () => clock;
 
-const { PORTRAIT_CACHE_LIMIT, PORTRAIT_RETRY_DELAYS, authorChip, forgetAuthorPortrait, portraitFor } = await import('./author-avatar.js');
+const { PORTRAIT_CACHE_LIMIT, PORTRAIT_RETRY_DELAYS, authorChip, authorMini, forgetAuthorPortrait, portraitFor } = await import('./author-avatar.js');
 const mina = '11111111-1111-4111-8111-111111111111';
 const julian = '22222222-2222-4222-8222-222222222222';
 const nora = '33333333-3333-4333-8333-333333333333';
@@ -228,4 +228,40 @@ assert.equal(offline.children[0].className, 'author-avatar is-unavailable');
 online = true;
 await portraitFor(helen);
 assert.ok(calls.some((url) => url.includes(helen)));
+
+const googleId = '99999999-9999-4999-8999-999999999999';
+const initialId = '12121212-1212-4212-8212-121212121212';
+const previousFetch = globalThis.fetch;
+globalThis.fetch = (url) => {
+  calls.push(String(url));
+  const address = String(url);
+  if (address.includes(googleId) || address.includes(initialId)) {
+    return Promise.resolve({ status: 404, ok: false, headers: { get: () => 'application/json' }, blob: async () => new Blob() });
+  }
+  return previousFetch(url);
+};
+const google = mount(authorMini('Mina Chen', googleId, { avatarUrl: 'https://cdn.example/mina.png' }));
+await portraitFor(googleId);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(google.attrs['aria-label'], 'Mina Chen');
+assert.equal(google.children[0].className, 'author-avatar is-picture');
+assert.equal(google.children[0].children[0].src, 'https://cdn.example/mina.png');
+const letters = mount(authorMini('Julian Park', initialId, { avatarUrl: 'http://evil.example/a.png' }));
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(letters.attrs['aria-label'], 'Julian Park');
+assert.equal(letters.children[0].className, 'author-avatar is-initials');
+assert.equal(letters.children[0].textContent, 'JP');
+const { directMessageLine } = await import('./community-view.js');
+const minaLine = directMessageLine({ body: 'Mine', authorId: googleId }, { id: googleId, name: 'Mina Chen', avatarUrl: '' });
+const julianLine = directMessageLine({ body: 'Yours', authorId: initialId }, { id: initialId, name: 'Julian Park', avatarUrl: '' });
+const repeat = directMessageLine({ body: 'Mine again', authorId: googleId }, { id: googleId, name: 'Mina Chen', avatarUrl: '' });
+for (const line of [minaLine, julianLine, repeat]) {
+  assert.equal(line.className, 'message-line');
+  assert.equal(line.children[0].className, 'author-mini');
+  assert.equal(line.children[1].className, 'message-bubble');
+  assert.equal(line.className.includes('row-reverse'), false);
+}
+assert.equal(minaLine.children[0].attrs['aria-label'], 'Mina Chen');
+assert.equal(repeat.children[0].attrs['aria-label'], 'Mina Chen');
+assert.equal(julianLine.children[0].attrs['aria-label'], 'Julian Park');
 console.log('author avatar tests passed');
