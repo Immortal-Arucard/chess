@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { createChessApp } from './chess-api.mjs';
+import { deliverDue } from './push-send.mjs';
 
 // Production Worker entry. Each request and each scheduled run opens its own
 // pg client from the cache-disabled Hyperdrive binding and closes it, including
@@ -98,11 +99,18 @@ const worker = {
     }
     try {
       return await withClient(connectionString, (client) => {
+        const vapid = env && env.VAPID_PRIVATE_KEY ? {
+          publicKey: env.VAPID_PUBLIC_KEY,
+          privateKey: env.VAPID_PRIVATE_KEY,
+          subject: env.VAPID_SUBJECT || 'mailto:cubzub@gmail.com'
+        } : null;
         const app = createChessApp({
           pool: oneClientPool(client),
           origin: env.CHESS_ORIGIN,
           supabaseUrl: env.SUPABASE_URL,
-          supabaseKey: env.SUPABASE_ANON_KEY
+          supabaseKey: env.SUPABASE_ANON_KEY,
+          vapidPublicKey: env && env.VAPID_PUBLIC_KEY,
+          deliver: vapid ? (query) => deliverDue(query, vapid) : null
         });
         return bridge(app, request);
       });

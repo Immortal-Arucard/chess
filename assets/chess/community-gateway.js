@@ -178,6 +178,28 @@ export function createChessGateway() {
     async sendMessage(withId, body, authorId) {
       return send('/api/messages', { with: withId, body, authorId });
     },
+    async pushConfig() {
+      const response = await fetch('/api/push/config', { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      return body;
+    },
+    async pushSettings() {
+      const response = await fetch('/api/push/settings', { credentials: 'same-origin', cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Notification settings could not be loaded.');
+      return body.settings || {};
+    },
+    async savePushSubscription(subscription, authorId) {
+      return send('/api/push/subscribe', { subscription, authorId });
+    },
+    async savePushPreference(kind, enabled) {
+      const profile = await this.profile();
+      return send('/api/push/settings', { kind, enabled, authorId: profile && profile.id });
+    },
+    async sendTestPush() {
+      const profile = await this.profile();
+      return send('/api/push/test', { authorId: profile && profile.id });
+    },
     async listReplies(postId, options) {
       const cursor = options && options.cursor;
       const limit = options && options.limit ? options.limit : 20;
